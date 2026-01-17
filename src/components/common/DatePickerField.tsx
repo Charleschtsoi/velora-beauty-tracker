@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
-import DatePicker from 'react-native-date-picker';
+import { View, Text, TouchableOpacity, StyleSheet, Platform, Modal } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
 import { formatDate } from '../../utils/dateHelpers';
 
@@ -28,10 +28,30 @@ export default function DatePickerField({
   maximumDate,
 }: DatePickerFieldProps) {
   const [datePickerVisible, setDatePickerVisible] = useState(false);
+  const [tempDate, setTempDate] = useState(value || new Date());
 
-  const handleConfirm = (date: Date) => {
-    onDateChange(date);
+  const handleConfirm = () => {
+    onDateChange(tempDate);
     setDatePickerVisible(false);
+  };
+
+  const handleCancel = () => {
+    setTempDate(value || new Date());
+    setDatePickerVisible(false);
+  };
+
+  const handleDateChange = (event: any, selectedDate?: Date) => {
+    if (Platform.OS === 'android') {
+      setDatePickerVisible(false);
+      if (selectedDate) {
+        onDateChange(selectedDate);
+      }
+    } else {
+      // iOS - update temp date
+      if (selectedDate) {
+        setTempDate(selectedDate);
+      }
+    }
   };
 
   return (
@@ -46,7 +66,10 @@ export default function DatePickerField({
           highlighted && styles.highlighted,
           value && styles.hasValue,
         ]}
-        onPress={() => setDatePickerVisible(true)}
+        onPress={() => {
+          setTempDate(value || new Date());
+          setDatePickerVisible(true);
+        }}
         activeOpacity={0.7}
       >
         <Text style={[styles.dateText, !value && styles.placeholder]}>
@@ -55,17 +78,48 @@ export default function DatePickerField({
         <Ionicons name="calendar-outline" size={20} color="#6b7280" />
       </TouchableOpacity>
 
-      <DatePicker
-        modal
-        open={datePickerVisible}
-        date={value || new Date()}
-        mode="date"
-        onConfirm={handleConfirm}
-        onCancel={() => setDatePickerVisible(false)}
-        minimumDate={minimumDate}
-        maximumDate={maximumDate}
-        theme={Platform.OS === 'ios' ? 'light' : 'auto'}
-      />
+      {Platform.OS === 'ios' ? (
+        <Modal
+          visible={datePickerVisible}
+          transparent
+          animationType="slide"
+          onRequestClose={handleCancel}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <TouchableOpacity onPress={handleCancel} style={styles.modalButton}>
+                  <Text style={styles.modalButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                <Text style={styles.modalTitle}>Select Date</Text>
+                <TouchableOpacity onPress={handleConfirm} style={styles.modalButton}>
+                  <Text style={[styles.modalButtonText, styles.modalButtonConfirm]}>Done</Text>
+                </TouchableOpacity>
+              </View>
+              <DateTimePicker
+                value={tempDate}
+                mode="date"
+                display="spinner"
+                onChange={handleDateChange}
+                minimumDate={minimumDate}
+                maximumDate={maximumDate}
+                themeVariant="light"
+              />
+            </View>
+          </View>
+        </Modal>
+      ) : (
+        datePickerVisible && (
+          <DateTimePicker
+            value={value || new Date()}
+            mode="date"
+            display="default"
+            onChange={handleDateChange}
+            minimumDate={minimumDate}
+            maximumDate={maximumDate}
+          />
+        )
+      )}
     </View>
   );
 }
@@ -96,7 +150,7 @@ const styles = StyleSheet.create({
     minHeight: 48,
   },
   highlighted: {
-    backgroundColor: '#fef3c7', // Yellow background
+    backgroundColor: '#fef3c7',
     borderColor: '#fbbf24',
   },
   hasValue: {
@@ -109,5 +163,42 @@ const styles = StyleSheet.create({
   },
   placeholder: {
     color: '#9ca3af',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#ffffff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingBottom: 20,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  modalTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1f2937',
+  },
+  modalButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  modalButtonText: {
+    fontSize: 16,
+    color: '#6b7280',
+  },
+  modalButtonConfirm: {
+    color: '#10b981',
+    fontWeight: '600',
   },
 });

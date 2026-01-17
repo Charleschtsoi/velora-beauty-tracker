@@ -11,7 +11,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { CameraView, CameraType, useCameraPermissions, BarcodeScanningResult } from 'expo-camera';
+import { CameraView, useCameraPermissions, BarcodeScanningResult, type CameraType } from 'expo-camera';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { showToast } from '../utils/toast';
@@ -39,28 +39,57 @@ export default function ScanScreen() {
     }
   }, [permission]);
 
+  // Cleanup when component unmounts or when leaving scanning mode
+  useEffect(() => {
+    return () => {
+      // Reset states when component unmounts
+      setScanned(false);
+      setIsScanning(false);
+    };
+  }, []);
+
   const handleBarCodeScanned = ({ type, data }: BarcodeScanningResult) => {
     if (scanned) return;
     
-    setScanned(true);
-    setIsScanning(false);
-    
-    // Vibrate on successful scan
-    if (Platform.OS === 'ios' || Platform.OS === 'android') {
-      Vibration.vibrate(VIBRATION_PATTERN);
-    }
-    
-    // Extract barcode value
-    const barcodeValue = data;
-    
-    // Show success toast
-    showToast(`Barcode scanned: ${barcodeValue}`, 'success');
-    
-    // Navigate to AddProductScreen with barcode after a brief delay
-    setTimeout(() => {
-      navigation.navigate('AddProduct', { barcode: barcodeValue });
+    try {
+      // Stop scanning immediately to prevent multiple scans
+      setScanned(true);
+      
+      // Extract barcode value
+      const barcodeValue = data;
+      
+      if (!barcodeValue || !barcodeValue.trim()) {
+        setScanned(false);
+        return;
+      }
+      
+      // Vibrate on successful scan
+      if (Platform.OS === 'ios' || Platform.OS === 'android') {
+        try {
+          Vibration.vibrate(VIBRATION_PATTERN);
+        } catch (vibrationError) {
+          // Silently handle vibration errors
+        }
+      }
+      
+      // Stop camera immediately before navigation
+      setIsScanning(false);
+      
+      // Small delay to ensure camera is fully stopped
+      setTimeout(() => {
+        // Show success toast
+        showToast(`Barcode scanned: ${barcodeValue}`, 'success');
+        
+        // Navigate to AddProductScreen with barcode
+        navigation.navigate('AddProduct', { barcode: barcodeValue });
+        setScanned(false);
+      }, 300);
+    } catch (error) {
+      // Handle any errors during barcode scanning
       setScanned(false);
-    }, 800);
+      setIsScanning(false);
+      showToast('Error scanning barcode. Please try again.', 'error');
+    }
   };
 
   const handleScanPress = async () => {
@@ -171,11 +200,11 @@ export default function ScanScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.cameraContainer}>
-        {isScanning ? (
+        {isScanning && permission?.granted && cameraAvailable ? (
           <CameraView
             ref={cameraRef}
             style={styles.camera}
-            facing={CameraType.back}
+            facing="back"
             enableTorch={flashlightEnabled}
             onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
             barcodeScannerSettings={{
@@ -191,6 +220,15 @@ export default function ScanScreen() {
                 'itf14',
                 'qr',
               ],
+            }}
+            onMountError={(error) => {
+              // Handle camera mount errors
+              setIsScanning(false);
+              setCameraAvailable(false);
+              showToast('Camera initialization failed. Please try again.', 'error');
+            }}
+            onCameraReady={() => {
+              // Camera is ready - no action needed, but this helps ensure proper initialization
             }}
           >
             <View style={styles.overlay}>
