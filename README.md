@@ -25,16 +25,18 @@ A React Native Expo app for tracking beauty product expiration dates with barcod
 
 ### Prerequisites
 
-- Node.js 20.19.x or later
-- npm or yarn
-- Expo Go app on your mobile device (for testing)
+- **Node.js** 20.19.x or later
+- **npm** or **yarn** package manager
+- **Expo Go** app on your mobile device (for testing on physical device)
+  - [iOS App Store](https://apps.apple.com/app/expo-go/id982107779)
+  - [Google Play Store](https://play.google.com/store/apps/details?id=host.exp.exponent)
 
 ### Installation
 
 1. Clone the repository:
 ```bash
-git clone <your-repo-url>
-cd "Hermes 2.0"
+git clone https://github.com/charleschtsoi/hermes-beauty-tracker.git
+cd hermes-beauty-tracker
 ```
 
 2. Install dependencies:
@@ -95,6 +97,22 @@ EXPO_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
 - **Android**: `npm run android`
 - **Web**: `npm run web`
 
+## Troubleshooting
+
+### Common Issues
+
+**SDK Version Mismatch**
+- If you see "Project is incompatible with this version of Expo Go", ensure you're using Expo SDK 54
+- Run `npx expo install --fix` to align all packages
+
+**Babel Errors**
+- If you see Babel configuration errors, ensure `babel-preset-expo` is installed
+- Check that `babel.config.js` has the correct NativeWind v4 configuration
+
+**Camera Permissions**
+- On first use, grant camera permissions when prompted
+- If camera doesn't work, use the "Manual Entry" option
+
 ## License
 
 Private project - All rights reserved
@@ -102,3 +120,11 @@ Private project - All rights reserved
 ## Demo Notes
 
 This is a demo version prepared for presentation. All data is mocked and authentication is disabled for easy demonstration.
+
+## Contributing
+
+This is a private project. For questions or issues, please contact the repository owner.
+
+## Acknowledgments
+
+Built with [Expo](https://expo.dev), [React Navigation](https://reactnavigation.org), and [NativeWind](https://www.nativewind.dev).
