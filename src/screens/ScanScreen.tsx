@@ -20,6 +20,7 @@ import { lookupProductByBarcode } from '../services/upcService';
 import { useProducts } from '../context/ProductContext';
 import { DEMO_MODE } from '../config/demoMode';
 import { DEMO_PRODUCTS } from '../config/demoProducts';
+import { SUBMISSION_DISABLE_PAID_APIS } from '../config/submissionConfig';
 import { onProductSaved } from '../services/localNotificationService';
 
 const { width, height } = Dimensions.get('window');
@@ -121,6 +122,18 @@ export default function ScanScreen() {
           photoUri: demo.demoPhotoUri ?? undefined,
         });
         showToast('Barcode lookup complete. Confirm details and save.', 'success');
+        return;
+      }
+
+      // Barcode lookup disabled for academic submission to avoid API costs; re-enable for production.
+      if (SUBMISSION_DISABLE_PAID_APIS) {
+        showToast('Add product details manually (barcode lookup disabled for submission).', 'info');
+        navigation.getParent()?.navigate('AddProduct' as never, {
+          barcode: barcodeValue,
+          scanNotFound: true,
+        });
+        setScanned(false);
+        processingScanRef.current = false;
         return;
       }
 
@@ -314,6 +327,19 @@ export default function ScanScreen() {
       }
 
       if (!photo?.uri) throw new Error('Failed to capture photo');
+
+      // AI analysis disabled for academic submission to avoid API costs; re-enable for production.
+      if (SUBMISSION_DISABLE_PAID_APIS) {
+        setIsScanning(false);
+        setIsAnalyzing(false);
+        setScanned(false);
+        showToast('Add product details manually (AI analysis disabled for submission).', 'info');
+        navigation.getParent()?.navigate('AddProduct' as never, {
+          photoUri: photo.uri,
+          scanNotFound: true,
+        });
+        return;
+      }
 
       showToast('Capturing and analyzing image...', 'info');
       const analysisResult = await analyzeProductImage(photo.uri, knownFieldsRef.current);
