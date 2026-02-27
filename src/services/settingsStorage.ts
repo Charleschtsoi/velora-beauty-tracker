@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const KEYS = {
   REMINDER_TIME: '@hermes/reminderTime',
+  REMINDER_DAYS_BEFORE: '@hermes/reminderDaysBefore',
   NOTIFICATIONS_ENABLED: '@hermes/notificationsEnabled',
   EXPIRING_SOON_ALERT: '@hermes/expiringSoonAlert',
   EXPIRED_ALERT: '@hermes/expiredAlert',
@@ -11,9 +12,12 @@ const KEYS = {
   REMINDERS_READ_IDS: '@hermes/remindersReadIds',
 } as const;
 
+export const REMINDER_DAYS_OPTIONS = [1, 3, 7, 14] as const;
+
 const DEFAULTS = {
   reminderHour: 9,
   reminderMinute: 0,
+  reminderDaysBefore: 1,
   notificationsEnabled: true,
   expiringSoonAlert: true,
   expiredAlert: true,
@@ -32,6 +36,23 @@ export async function getReminderTime(): Promise<{ hour: number; minute: number 
 export async function setReminderTime(hour: number, minute: number): Promise<void> {
   try {
     await AsyncStorage.setItem(KEYS.REMINDER_TIME, `${hour}:${minute}`);
+  } catch {}
+}
+
+export async function getReminderDaysBefore(): Promise<number> {
+  try {
+    const v = await AsyncStorage.getItem(KEYS.REMINDER_DAYS_BEFORE);
+    if (v == null) return DEFAULTS.reminderDaysBefore;
+    const n = parseInt(v, 10);
+    if (REMINDER_DAYS_OPTIONS.includes(n as 1 | 3 | 7 | 14)) return n;
+  } catch {}
+  return DEFAULTS.reminderDaysBefore;
+}
+
+export async function setReminderDaysBefore(days: number): Promise<void> {
+  try {
+    const valid = REMINDER_DAYS_OPTIONS.includes(days as 1 | 3 | 7 | 14) ? days : DEFAULTS.reminderDaysBefore;
+    await AsyncStorage.setItem(KEYS.REMINDER_DAYS_BEFORE, String(valid));
   } catch {}
 }
 

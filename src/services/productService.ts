@@ -1,5 +1,53 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Product } from '../types/product.types';
 import { supabase } from './supabase';
+
+const PRODUCTS_STORAGE_KEY = '@hermes/products';
+
+/** Serialize Product for storage (dates to ISO strings). */
+function productToStored(p: Product): Record<string, unknown> {
+  return {
+    ...p,
+    purchaseDate: p.purchaseDate?.toISOString?.() ?? null,
+    expirationDate: p.expirationDate?.toISOString?.() ?? null,
+    openedDate: p.openedDate?.toISOString?.() ?? null,
+    createdAt: p.createdAt?.toISOString?.() ?? null,
+    updatedAt: p.updatedAt?.toISOString?.() ?? null,
+  };
+}
+
+/** Deserialize stored JSON back to Product (ISO strings to Date). */
+function storedToProduct(raw: Record<string, unknown>): Product {
+  return {
+    ...raw,
+    purchaseDate: raw.purchaseDate ? new Date(raw.purchaseDate as string) : undefined,
+    expirationDate: new Date(raw.expirationDate as string),
+    openedDate: raw.openedDate ? new Date(raw.openedDate as string) : undefined,
+    createdAt: new Date(raw.createdAt as string),
+    updatedAt: new Date(raw.updatedAt as string),
+  } as Product;
+}
+
+export async function loadProductsFromStorage(): Promise<Product[] | null> {
+  try {
+    const raw = await AsyncStorage.getItem(PRODUCTS_STORAGE_KEY);
+    if (!raw) return null;
+    const arr = JSON.parse(raw) as Record<string, unknown>[];
+    if (!Array.isArray(arr) || arr.length === 0) return null;
+    return arr.map(storedToProduct);
+  } catch {
+    return null;
+  }
+}
+
+export async function persistProducts(products: Product[]): Promise<void> {
+  try {
+    const toStore = products.map(productToStored);
+    await AsyncStorage.setItem(PRODUCTS_STORAGE_KEY, JSON.stringify(toStore));
+  } catch {
+    // Silently ignore storage errors
+  }
+}
 
 // Mock data for initial development / investor demo
 // TODO: Replace with real Supabase queries when ready
@@ -237,8 +285,10 @@ export const fetchProducts = async (): Promise<Product[]> => {
   // if (error) throw error;
   // return data ? data.map(convertProductDates) : [];
 
-  // Mock implementation for now
-  return Promise.resolve(mockProducts);
+  // Demo: use persisted list if non-empty so user-added products survive restart
+  const stored = await loadProductsFromStorage();
+  if (stored && stored.length > 0) return stored;
+  return mockProducts;
 };
 
 /**

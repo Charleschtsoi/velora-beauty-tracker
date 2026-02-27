@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useRef, useEffect } from 'react';
+import { View, Text, Image, TouchableOpacity, StyleSheet, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Product, ProductCategory } from '../../types/product.types';
 import { getExpirationStatus, formatDate, getDaysUntilExpiration } from '../../utils/dateHelpers';
@@ -22,6 +22,8 @@ interface ProductListItemProps {
   onDelete?: () => void;
   compact?: boolean;
   testID?: string;
+  /** Optional delay in ms for staggered entrance (e.g. index * 40). */
+  entranceDelay?: number;
 }
 
 const getStatusConfig = (status: ExpirationStatus, daysUntil: number) => {
@@ -48,11 +50,23 @@ export default function ProductListItem({
   onDelete,
   compact = false,
   testID,
+  entranceDelay = 0,
 }: ProductListItemProps) {
   const status = getExpirationStatus(product.expirationDate);
   const daysUntil = getDaysUntilExpiration(product.expirationDate);
   const statusConfig = getStatusConfig(status, daysUntil);
   const categoryLabel = CATEGORY_LABELS[product.category];
+  const opacity = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new Animated.Value(8)).current;
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      Animated.parallel([
+        Animated.timing(opacity, { toValue: 1, duration: 240, useNativeDriver: true }),
+        Animated.timing(translateY, { toValue: 0, duration: 240, useNativeDriver: true }),
+      ]).start();
+    }, entranceDelay);
+    return () => clearTimeout(timer);
+  }, [entranceDelay, opacity, translateY]);
 
   const containerStyle = compact ? [styles.container, styles.containerCompact] : styles.container;
   const imageSize = compact ? 44 : 60;
@@ -60,10 +74,11 @@ export default function ProductListItem({
   const placeholderStyle = [styles.imagePlaceholder, compact && { width: imageSize, height: imageSize }];
 
   return (
+    <Animated.View style={{ opacity, transform: [{ translateY }] }}>
     <TouchableOpacity
       style={containerStyle}
       onPress={onPress}
-      activeOpacity={0.7}
+      activeOpacity={0.72}
       testID={testID}
     >
       {/* Image column */}
@@ -128,6 +143,7 @@ export default function ProductListItem({
         </TouchableOpacity>
       )}
     </TouchableOpacity>
+    </Animated.View>
   );
 }
 
@@ -139,7 +155,7 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     marginBottom: spacing.sm,
     alignItems: 'center',
-    ...shadow.card,
+    ...shadow.cardSubtle,
   },
   containerCompact: {
     padding: spacing.sm,

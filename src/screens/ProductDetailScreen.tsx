@@ -21,7 +21,8 @@ import PhotoUploader from '../components/common/PhotoUploader';
 import DatePickerField from '../components/common/DatePickerField';
 import DropdownSelect from '../components/common/DropdownSelect';
 import { showToast } from '../utils/toast';
-import { onProductUpdated, cancelExpiryReminder } from '../services/localNotificationService';
+import { onProductUpdated, cancelExpiryReminder, cancelPAOReminder } from '../services/localNotificationService';
+import { colors } from '../theme';
 
 // Navigation types
 type RootStackParamList = {
@@ -48,44 +49,44 @@ const getStatusConfig = (status: ExpirationStatus, daysUntil: number) => {
     case ExpirationStatus.EXPIRED:
       return {
         text: 'EXPIRED',
-        color: '#ef4444',
-        bgColor: '#fee2e2',
+        color: colors.statusExpired,
+        bgColor: colors.statusExpiredBg,
         description: 'This product has expired',
       };
     case ExpirationStatus.EXPIRING_SOON:
       if (daysUntil === 0) {
         return {
           text: 'EXPIRES TODAY',
-          color: '#f97316',
-          bgColor: '#fed7aa',
+          color: colors.statusExpiringSoon,
+          bgColor: colors.statusExpiringSoonBg,
           description: 'Expires today!',
         };
       }
       return {
         text: 'EXPIRING SOON',
-        color: '#f97316',
-        bgColor: '#fed7aa',
+        color: colors.statusExpiringSoon,
+        bgColor: colors.statusExpiringSoonBg,
         description: `Expires in ${daysUntil} day${daysUntil !== 1 ? 's' : ''}`,
       };
     case ExpirationStatus.WARNING:
       return {
         text: 'WARNING',
-        color: '#fbbf24',
-        bgColor: '#fef3c7',
+        color: colors.statusWarning,
+        bgColor: colors.statusWarningBg,
         description: `Expires in ${daysUntil} days`,
       };
     case ExpirationStatus.SAFE:
       return {
         text: 'SAFE',
-        color: '#10b981',
-        bgColor: '#d1fae5',
+        color: colors.statusSafe,
+        bgColor: colors.statusSafeBg,
         description: `Expires in ${daysUntil} days`,
       };
     default:
       return {
         text: 'UNKNOWN',
-        color: '#6b7280',
-        bgColor: '#f3f4f6',
+        color: colors.statusMuted,
+        bgColor: colors.statusMutedBg,
         description: 'Status unknown',
       };
   }
@@ -166,6 +167,8 @@ export default function ProductDetailScreen() {
         purchaseDate,
         usageCount: quantity,
         notes: notes.trim() || undefined,
+        openedDate: product.openedDate,
+        paoMonths: product.paoMonths,
       };
       await updateProduct(product.id, updates);
 
@@ -204,6 +207,7 @@ export default function ProductDetailScreen() {
           onPress: async () => {
             try {
               await cancelExpiryReminder(product.id);
+              await cancelPAOReminder(product.id);
               await deleteProduct(product.id);
               showToast('Product deleted successfully!', 'success');
               setTimeout(() => navigation.goBack(), 500);

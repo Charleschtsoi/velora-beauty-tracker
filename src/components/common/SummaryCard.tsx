@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Image, ImageSourcePropType } from 'react-native';
+import React, { useRef, useEffect } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Image, ImageSourcePropType, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, radius, shadow, typography } from '../../theme';
 
@@ -14,10 +14,23 @@ interface SummaryCardProps {
   image?: ImageSourcePropType;
   onPress?: () => void;
   testID?: string;
+  /** Optional delay in ms for staggered entrance (e.g. index * 50). */
+  entranceDelay?: number;
 }
 
-export default function SummaryCard({ title, count, icon, color, iconBackgroundColor, image, onPress, testID }: SummaryCardProps) {
+export default function SummaryCard({ title, count, icon, color, iconBackgroundColor, image, onPress, testID, entranceDelay = 0 }: SummaryCardProps) {
   const [imageError, setImageError] = React.useState(false);
+  const opacity = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new Animated.Value(8)).current;
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      Animated.parallel([
+        Animated.timing(opacity, { toValue: 1, duration: 280, useNativeDriver: true }),
+        Animated.timing(translateY, { toValue: 0, duration: 280, useNativeDriver: true }),
+      ]).start();
+    }, entranceDelay);
+    return () => clearTimeout(timer);
+  }, [entranceDelay, opacity, translateY]);
   const showImage = Boolean(image && !imageError);
   const bgColor = iconBackgroundColor ?? colors.primaryTint;
 
@@ -42,25 +55,30 @@ export default function SummaryCard({ title, count, icon, color, iconBackgroundC
     </View>
   );
 
+  const animatedContent = (
+    <Animated.View style={{ opacity, transform: [{ translateY }] }}>
+      {CardContent}
+    </Animated.View>
+  );
   if (onPress) {
     return (
       <TouchableOpacity onPress={onPress} testID={testID} activeOpacity={0.7}>
-        {CardContent}
+        {animatedContent}
       </TouchableOpacity>
     );
   }
 
-  return <View testID={testID}>{CardContent}</View>;
+  return <View testID={testID}>{animatedContent}</View>;
 }
 
 const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
     backgroundColor: colors.surface,
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
     padding: spacing.md,
     marginVertical: spacing.xs,
-    borderLeftWidth: 4,
+    borderLeftWidth: 3,
     ...shadow.cardRaised,
   },
   iconContainer: {

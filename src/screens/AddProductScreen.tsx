@@ -92,6 +92,22 @@ export default function AddProductScreen() {
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [fieldSources, setFieldSources] = useState<Record<AIFieldKey, FieldSourceInfo>>(initialFieldSources);
+  const [showScanNotFoundBanner, setShowScanNotFoundBanner] = useState(Boolean(route.params?.scanNotFound));
+
+  const resetForm = useCallback(() => {
+    setProductName('');
+    setBrand('');
+    setCategory(ProductCategory.SKINCARE);
+    setBarcode('');
+    setPhotoUri(undefined);
+    setExpirationDate(undefined);
+    setPurchaseDate(undefined);
+    setQuantity(1);
+    setNotes('');
+    setErrors({});
+    setFieldSources(initialFieldSources);
+    setShowScanNotFoundBanner(false);
+  }, []);
 
   const mergeNotes = useCallback((incoming: string | null) => {
     if (!incoming) return;
@@ -159,6 +175,10 @@ export default function AddProductScreen() {
   useEffect(() => {
     const params = route.params;
     if (!params) return;
+
+    if (params.scanNotFound) {
+      setShowScanNotFoundBanner(true);
+    }
 
     if (params.barcode) {
       setBarcode(params.barcode);
@@ -228,9 +248,14 @@ export default function AddProductScreen() {
       if (newProduct) onProductSaved(newProduct);
 
       showToast('Product added successfully!', 'success');
-      setTimeout(() => {
-        navigation.navigate('MainTabs', { screen: 'Inventory' });
-      }, 500);
+      Alert.alert(
+        'Product saved',
+        'Add another product or go back to your collection.',
+        [
+          { text: 'Add another', onPress: resetForm },
+          { text: 'Back to collection', onPress: () => navigation.navigate('MainTabs', { screen: 'Inventory' }) },
+        ]
+      );
     } catch (error) {
       showToast(
         error instanceof Error
@@ -284,6 +309,23 @@ export default function AddProductScreen() {
             We'll remind you before it expires.
           </Text>
         </View>
+
+        {/* Scan not found / error banner */}
+        {showScanNotFoundBanner && (
+          <View style={styles.scanNotFoundBanner}>
+            <Ionicons name="information-circle" size={20} color="#10b981" />
+            <Text style={styles.scanNotFoundBannerText}>
+              We couldn't find this product. You can edit the fields below or try another photo.
+            </Text>
+            <TouchableOpacity
+              onPress={() => setShowScanNotFoundBanner(false)}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              style={styles.scanNotFoundDismiss}
+            >
+              <Ionicons name="close" size={22} color="#6b7280" />
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* Barcode Data Indicator */}
         {route.params?.upcData && (
@@ -534,6 +576,25 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#065f46',
     fontWeight: '500',
+  },
+  scanNotFoundBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fef3c7',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    marginBottom: 16,
+    gap: 10,
+  },
+  scanNotFoundBannerText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#92400e',
+    fontWeight: '500',
+  },
+  scanNotFoundDismiss: {
+    padding: 4,
   },
   expiryHelper: {
     fontSize: 13,

@@ -160,6 +160,7 @@ export default function ScanScreen() {
       navigation.getParent()?.navigate('AddProduct' as never, {
         barcode: barcodeValue,
         upcData,
+        scanNotFound: !lookup.success || !lookup.data,
       });
       setScanned(false);
       processingScanRef.current = false;
@@ -168,7 +169,12 @@ export default function ScanScreen() {
       setIsScanning(false);
       setIsAddingDemo(false);
       processingScanRef.current = false;
+      setLookupInProgress(false);
       showToast('Error scanning barcode. Please try again.', 'error');
+      navigation.getParent()?.navigate('AddProduct' as never, {
+        barcode: barcodeValue,
+        scanNotFound: true,
+      });
     }
   };
 
@@ -340,6 +346,10 @@ export default function ScanScreen() {
       setIsScanning(false);
       setScanned(false);
       showToast(error.message || 'Failed to analyze image. Please try again.', 'error');
+      navigation.getParent()?.navigate('AddProduct' as never, {
+        photoUri: photo?.uri,
+        scanNotFound: true,
+      });
     }
   };
 

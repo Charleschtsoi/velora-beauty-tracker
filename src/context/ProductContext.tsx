@@ -49,7 +49,9 @@ export const ProductProvider = ({ children }: { children: ReactNode }) => {
         createdAt: new Date(),
         updatedAt: new Date(),
       };
-      setProducts([newProduct, ...products]);
+      const nextProducts = [newProduct, ...products];
+      setProducts(nextProducts);
+      await productService.persistProducts(nextProducts);
       return newProduct;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to add product';
@@ -66,7 +68,9 @@ export const ProductProvider = ({ children }: { children: ReactNode }) => {
     try {
       // Simulate network delay for demo
       await new Promise(resolve => setTimeout(resolve, 300));
-      setProducts(products.map(p => p.id === id ? { ...p, ...updates, updatedAt: new Date() } : p));
+      const nextProducts = products.map(p => p.id === id ? { ...p, ...updates, updatedAt: new Date() } : p);
+      setProducts(nextProducts);
+      await productService.persistProducts(nextProducts);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to update product';
       setError(errorMessage);
@@ -82,7 +86,9 @@ export const ProductProvider = ({ children }: { children: ReactNode }) => {
     try {
       // Simulate network delay for demo
       await new Promise(resolve => setTimeout(resolve, 300));
-      setProducts(products.filter(p => p.id !== id));
+      const nextProducts = products.filter(p => p.id !== id);
+      setProducts(nextProducts);
+      await productService.persistProducts(nextProducts);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to delete product';
       setError(errorMessage);

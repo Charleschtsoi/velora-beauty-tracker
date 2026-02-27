@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { ExpirationStatus } from '../../types/product.types';
+import { colors } from '../../theme';
 
 interface StatusBadgeProps {
   status: ExpirationStatus;
@@ -11,15 +12,15 @@ interface StatusBadgeProps {
 const getStatusConfig = (status: ExpirationStatus) => {
   switch (status) {
     case ExpirationStatus.EXPIRED:
-      return { text: 'Expired', color: '#ef4444', bgColor: '#fee2e2' };
+      return { text: 'Expired', color: colors.statusExpired, bgColor: colors.statusExpiredBg };
     case ExpirationStatus.EXPIRING_SOON:
-      return { text: 'Expiring', color: '#f97316', bgColor: '#fed7aa' };
+      return { text: 'Expiring', color: colors.statusExpiringSoon, bgColor: colors.statusExpiringSoonBg };
     case ExpirationStatus.WARNING:
-      return { text: 'Warning', color: '#fbbf24', bgColor: '#fef3c7' };
+      return { text: 'Warning', color: colors.statusWarning, bgColor: colors.statusWarningBg };
     case ExpirationStatus.SAFE:
-      return { text: 'Safe', color: '#10b981', bgColor: '#d1fae5' };
+      return { text: 'Safe', color: colors.statusSafe, bgColor: colors.statusSafeBg };
     default:
-      return { text: 'Unknown', color: '#6b7280', bgColor: '#f3f4f6' };
+      return { text: 'Unknown', color: colors.statusMuted, bgColor: colors.statusMutedBg };
   }
 };
 

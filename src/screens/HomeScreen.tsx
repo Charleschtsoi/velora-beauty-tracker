@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,8 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Modal,
+  Animated,
+  Pressable,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -27,6 +29,95 @@ type RootStackParamList = {
   Scan: undefined;
   ProductDetail: { productId: string };
 };
+
+function ScanButtonWithPressFeedback({ onPress }: { onPress: () => void }) {
+  const scale = useRef(new Animated.Value(1)).current;
+  return (
+    <Pressable
+      onPress={onPress}
+      onPressIn={() => Animated.timing(scale, { toValue: 0.98, duration: 80, useNativeDriver: true }).start()}
+      onPressOut={() => Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 200 }).start()}
+    >
+      <Animated.View style={[styles.scanButton, { transform: [{ scale }] }]}>
+        <Ionicons name="camera" size={24} color={colors.white} />
+        <Text style={styles.scanButtonText}>Scan New Product</Text>
+      </Animated.View>
+    </Pressable>
+  );
+}
+
+function FirstRunModal({
+  visible,
+  onDismiss,
+  onScan,
+  onAddManual,
+}: {
+  visible: boolean;
+  onDismiss: () => void;
+  onScan: () => void;
+  onAddManual: () => void;
+}) {
+  const overlayOpacity = useRef(new Animated.Value(0)).current;
+  const cardTranslateY = useRef(new Animated.Value(24)).current;
+  const cardOpacity = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (visible) {
+      overlayOpacity.setValue(0);
+      cardTranslateY.setValue(24);
+      cardOpacity.setValue(0);
+      Animated.parallel([
+        Animated.timing(overlayOpacity, { toValue: 1, duration: 220, useNativeDriver: true }),
+        Animated.parallel([
+          Animated.timing(cardOpacity, { toValue: 1, duration: 280, useNativeDriver: true }),
+          Animated.spring(cardTranslateY, { toValue: 0, useNativeDriver: true, speed: 20, bounciness: 8 }),
+        ]),
+      ]).start();
+    }
+  }, [visible, overlayOpacity, cardTranslateY, cardOpacity]);
+
+  if (!visible) return null;
+  return (
+    <Modal transparent animationType="fade" visible={visible} onRequestClose={onDismiss}>
+      <Animated.View style={[styles.firstRunOverlay, { opacity: overlayOpacity }]}>
+        <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onDismiss} />
+        <Animated.View
+          style={[
+            styles.firstRunCard,
+            {
+              opacity: cardOpacity,
+              transform: [{ translateY: cardTranslateY }],
+              zIndex: 1,
+            },
+          ]}
+          onStartShouldSetResponder={() => true}
+        >
+          <Text style={styles.firstRunTitle}>Never miss a use-by date</Text>
+          <Text style={styles.firstRunSubtitle}>Scan or add your first product to get reminders.</Text>
+          <TouchableOpacity
+            style={styles.firstRunButton}
+            onPress={onScan}
+            activeOpacity={0.8}
+            testID="first-run-scan"
+          >
+            <Ionicons name="camera" size={20} color={colors.white} />
+            <Text style={styles.firstRunButtonText}>Scan product</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.firstRunButtonSecondary}
+            onPress={onAddManual}
+            activeOpacity={0.8}
+            testID="first-run-add"
+          >
+            <Text style={styles.firstRunButtonSecondaryText}>Add manually</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.firstRunSkip} onPress={onDismiss} testID="first-run-skip">
+            <Text style={styles.firstRunSkipText}>Skip</Text>
+          </TouchableOpacity>
+        </Animated.View>
+      </Animated.View>
+    </Modal>
+  );
+}
 
 export default function HomeScreen() {
   const { products, loading } = useProducts();
@@ -177,28 +268,31 @@ export default function HomeScreen() {
             title="Expiring Soon"
             count={stats.expiringSoon}
             icon="time"
-            color="#f97316"
+            color={colors.statusExpiringSoon}
             iconBackgroundColor={colors.statusExpiringSoonBg}
             onPress={() => handleSummaryCardPress('expiring_soon')}
             testID="expiring-soon-card"
+            entranceDelay={0}
           />
           <SummaryCard
             title="Expired"
             count={stats.expired}
             icon="alert-circle"
-            color="#ef4444"
+            color={colors.statusExpired}
             iconBackgroundColor={colors.statusExpiredBg}
             onPress={() => handleSummaryCardPress('expired')}
             testID="expired-items-card"
+            entranceDelay={50}
           />
           <SummaryCard
             title="In collection"
             count={stats.total}
             icon="cube"
-            color="#10b981"
+            color={colors.primary}
             iconBackgroundColor={colors.statusSafeBg}
             onPress={() => handleSummaryCardPress('all')}
             testID="total-items-card"
+            entranceDelay={100}
           />
         </View>
 
@@ -207,7 +301,7 @@ export default function HomeScreen() {
           onPress={() => navigation.getParent()?.navigate('Categories' as never)}
           testID="browse-categories-link"
         >
-          <Ionicons name="grid-outline" size={18} color="#10b981" />
+          <Ionicons name="grid-outline" size={18} color={colors.primary} />
           <Text style={styles.browseCategoriesLinkText}>Browse by category</Text>
         </TouchableOpacity>
 
@@ -215,12 +309,13 @@ export default function HomeScreen() {
         {expiringSoonProducts.length > 0 && (
           <View style={styles.recentSection}>
             <Text style={styles.sectionTitle}>Expiring soon</Text>
-            {expiringSoonProducts.map((product) => (
+            {expiringSoonProducts.map((product, index) => (
               <ProductCard
                 key={product.id}
                 product={product}
                 onPress={() => handleProductPress(product.id)}
                 testID={`expiring-soon-product-${product.id}`}
+                entranceDelay={index * 50}
               />
             ))}
           </View>
@@ -230,12 +325,13 @@ export default function HomeScreen() {
         {recentProducts.length > 0 ? (
           <View style={styles.recentSection}>
             <Text style={styles.sectionTitle}>Recently Added</Text>
-            {recentProducts.map((product) => (
+            {recentProducts.map((product, index) => (
               <ProductCard
                 key={product.id}
                 product={product}
                 onPress={() => handleProductPress(product.id)}
                 testID={`recent-product-${product.id}`}
+                entranceDelay={index * 50}
               />
             ))}
           </View>
@@ -248,15 +344,7 @@ export default function HomeScreen() {
         )}
 
         {/* Scan Button */}
-        <TouchableOpacity
-          style={styles.scanButton}
-          onPress={handleScanPress}
-          activeOpacity={0.8}
-          testID="scan-button"
-        >
-          <Ionicons name="camera" size={24} color="#ffffff" />
-          <Text style={styles.scanButtonText}>Scan New Product</Text>
-        </TouchableOpacity>
+        <ScanButtonWithPressFeedback onPress={handleScanPress} />
         <TouchableOpacity
           style={styles.manualEntryLink}
           onPress={() => navigation.getParent()?.navigate('AddProduct' as never)}
@@ -267,47 +355,12 @@ export default function HomeScreen() {
       </ScrollView>
 
       {/* First-run: one line of value + CTA, skippable */}
-      <Modal
+      <FirstRunModal
         visible={firstRunVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={dismissFirstRun}
-      >
-        <TouchableOpacity
-          style={styles.firstRunOverlay}
-          activeOpacity={1}
-          onPress={dismissFirstRun}
-        >
-          <View style={styles.firstRunCard} onStartShouldSetResponder={() => true}>
-            <Text style={styles.firstRunTitle}>Never miss a use-by date</Text>
-            <Text style={styles.firstRunSubtitle}>Scan or add your first product to get reminders.</Text>
-            <TouchableOpacity
-              style={styles.firstRunButton}
-              onPress={handleFirstRunScan}
-              activeOpacity={0.8}
-              testID="first-run-scan"
-            >
-              <Ionicons name="camera" size={20} color="#fff" />
-              <Text style={styles.firstRunButtonText}>Scan product</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.firstRunButtonSecondary}
-              onPress={handleFirstRunAdd}
-              activeOpacity={0.8}
-              testID="first-run-add"
-            >
-              <Text style={styles.firstRunButtonSecondaryText}>Add manually</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.firstRunSkip}
-              onPress={dismissFirstRun}
-              testID="first-run-skip"
-            >
-              <Text style={styles.firstRunSkipText}>Skip</Text>
-            </TouchableOpacity>
-          </View>
-        </TouchableOpacity>
-      </Modal>
+        onDismiss={dismissFirstRun}
+        onScan={handleFirstRunScan}
+        onAddManual={handleFirstRunAdd}
+      />
     </SafeAreaView>
   );
 }
@@ -345,9 +398,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   logo: {
-    ...typography.headline,
+    ...typography.display,
     color: colors.primary,
-    letterSpacing: 1,
   },
   headerRight: {
     flexDirection: 'row',

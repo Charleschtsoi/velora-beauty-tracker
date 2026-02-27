@@ -28,7 +28,9 @@ export default function EmptyState({
 }: EmptyStateProps) {
   return (
     <View style={styles.container} testID={testID}>
-      <Ionicons name={icon} size={64} color={colors.textTertiary} />
+      <View style={styles.iconCircle}>
+        <Ionicons name={icon} size={56} color={colors.textTertiary} />
+      </View>
       <Text style={styles.title}>{title}</Text>
       <Text style={styles.subtitle}>{subtitle}</Text>
       {buttonLabel && onButtonPress && (
@@ -51,6 +53,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: spacing.xl,
     paddingVertical: spacing.xxl,
+  },
+  iconCircle: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: colors.primaryTint,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   title: {
     ...typography.title,

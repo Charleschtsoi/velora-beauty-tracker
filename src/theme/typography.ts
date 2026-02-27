@@ -1,6 +1,6 @@
 /**
  * Design tokens: type scale and text styles.
- * Roles: caption, body, bodyStrong, subtitle, title, headline.
+ * Roles: caption, body, bodyStrong, subtitle, title, headline, display (logo).
  */
 import { TextStyle } from 'react-native';
 
@@ -11,9 +11,16 @@ const scale = {
   subtitle: 18,
   title: 20,
   headline: 24,
+  display: 22,
 } as const;
 
 export const typography = {
+  /** For app logo / brand wordmark; premium, editorial feel. */
+  display: {
+    fontSize: scale.display,
+    fontWeight: '700' as const,
+    letterSpacing: 1.2,
+  },
   caption: {
     fontSize: scale.caption,
     fontWeight: '400' as const,

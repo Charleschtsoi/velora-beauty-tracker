@@ -1,5 +1,7 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import type { BottomTabBarButtonProps } from '@react-navigation/bottom-tabs';
+import { Animated, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing } from '../theme';
 import HomeScreen from '../screens/HomeScreen';
@@ -10,7 +12,41 @@ import SettingsScreen from '../screens/SettingsScreen';
 
 const Tab = createBottomTabNavigator();
 
+const tabBarShadow = {
+  shadowColor: '#1f2937',
+  shadowOffset: { width: 0, height: -2 },
+  shadowOpacity: 0.06,
+  shadowRadius: 4,
+  elevation: 8,
+};
 
+function AnimatedTabButton(props: BottomTabBarButtonProps) {
+  const scale = useRef(new Animated.Value(1)).current;
+  const onPressIn = () => {
+    Animated.spring(scale, { toValue: 1.08, useNativeDriver: true, speed: 200 }).start();
+  };
+  const onPressOut = () => {
+    Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 200 }).start();
+  };
+  return (
+    <Pressable
+      {...props}
+      onPressIn={(e) => {
+        onPressIn();
+        props.onPressIn?.(e as any);
+      }}
+      onPressOut={(e) => {
+        onPressOut();
+        props.onPressOut?.(e as any);
+      }}
+      style={[{ flex: 1 }, props.style]}
+    >
+      <Animated.View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', transform: [{ scale }] }}>
+        {props.children}
+      </Animated.View>
+    </Pressable>
+  );
+}
 
 export default function TabNavigator() {
   return (
@@ -25,6 +61,7 @@ export default function TabNavigator() {
           paddingBottom: spacing.xxs,
           paddingTop: spacing.xxs,
           height: 60,
+          ...tabBarShadow,
         },
         headerStyle: {
           backgroundColor: colors.surface,
@@ -33,6 +70,7 @@ export default function TabNavigator() {
         headerTitleStyle: {
           fontWeight: '600',
         },
+        tabBarButton: (props) => <AnimatedTabButton {...props} />,
       }}
     >
       <Tab.Screen
