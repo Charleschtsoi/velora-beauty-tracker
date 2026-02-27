@@ -21,6 +21,7 @@ import PhotoUploader from '../components/common/PhotoUploader';
 import DatePickerField from '../components/common/DatePickerField';
 import DropdownSelect from '../components/common/DropdownSelect';
 import { showToast } from '../utils/toast';
+import { onProductUpdated, cancelExpiryReminder } from '../services/localNotificationService';
 
 // Navigation types
 type RootStackParamList = {
@@ -103,6 +104,7 @@ export default function ProductDetailScreen() {
 
   // Form state (for edit mode)
   const [productName, setProductName] = useState('');
+  const [brand, setBrand] = useState('');
   const [category, setCategory] = useState<ProductCategory>(ProductCategory.SKINCARE);
   const [barcode, setBarcode] = useState('');
   const [photoUri, setPhotoUri] = useState<string | undefined>();
@@ -115,6 +117,7 @@ export default function ProductDetailScreen() {
   useEffect(() => {
     if (product) {
       setProductName(product.name);
+      setBrand(product.brand || '');
       setCategory(product.category);
       setBarcode(product.barcode || '');
       setPhotoUri(product.photoUrl);
@@ -153,8 +156,9 @@ export default function ProductDetailScreen() {
 
     setSaving(true);
     try {
-      await updateProduct(product.id, {
+      const updates = {
         name: productName.trim(),
+        brand: brand.trim() || undefined,
         category,
         barcode: barcode.trim() || undefined,
         photoUrl: photoUri,
@@ -162,7 +166,17 @@ export default function ProductDetailScreen() {
         purchaseDate,
         usageCount: quantity,
         notes: notes.trim() || undefined,
-      });
+      };
+      await updateProduct(product.id, updates);
+
+      // Update expiry reminder so it reflects the new date (e.g. if now safe, reminder moves)
+      const updatedProduct: Product = {
+        ...product,
+        ...updates,
+        expirationDate: expirationDate!,
+        updatedAt: new Date(),
+      };
+      await onProductUpdated(updatedProduct);
 
       showToast('Product updated successfully!', 'success');
       setIsEditMode(false);
@@ -189,6 +203,7 @@ export default function ProductDetailScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
+              await cancelExpiryReminder(product.id);
               await deleteProduct(product.id);
               showToast('Product deleted successfully!', 'success');
               setTimeout(() => navigation.goBack(), 500);
@@ -326,6 +341,28 @@ export default function ProductDetailScreen() {
             <Text style={styles.label}>Product Name</Text>
             <Text style={styles.value}>{product.name}</Text>
           </View>
+        )}
+
+        {/* Brand */}
+        {isEditMode ? (
+          <View style={styles.fieldContainer}>
+            <Text style={styles.label}>Brand</Text>
+            <TextInput
+              style={styles.input}
+              value={brand}
+              onChangeText={setBrand}
+              placeholder="e.g. CeraVe, The Ordinary"
+              placeholderTextColor="#9ca3af"
+              testID="brand-input"
+            />
+          </View>
+        ) : (
+          product.brand ? (
+            <View style={styles.fieldContainer}>
+              <Text style={styles.label}>Brand</Text>
+              <Text style={styles.value}>{product.brand}</Text>
+            </View>
+          ) : null
         )}
 
         {/* Category */}
@@ -482,6 +519,7 @@ export default function ProductDetailScreen() {
                 // Reset form to original values
                 if (product) {
                   setProductName(product.name);
+                  setBrand(product.brand || '');
                   setCategory(product.category);
                   setBarcode(product.barcode || '');
                   setPhotoUri(product.photoUrl);

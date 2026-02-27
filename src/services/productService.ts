@@ -1,28 +1,43 @@
 import { Product } from '../types/product.types';
 import { supabase } from './supabase';
 
-// Mock data for initial development
+// Mock data for initial development / investor demo
 // TODO: Replace with real Supabase queries when ready
 
-// Demo data for presentation - 10 realistic beauty products
+/** Add days to today (at midnight) for stable demo dates relative to "now". */
+const daysFromNow = (days: number): Date => {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() + days);
+  return d;
+};
+
+const now = new Date();
+const baseCreated = (daysAgo: number) => {
+  const d = new Date(now);
+  d.setDate(d.getDate() - daysAgo);
+  return d;
+};
+
+// Demo data: dates relative to today so "Expiring soon" and "Expired" always show correctly
 const mockProducts: Product[] = [
-  // 2 EXPIRED products
+  // —— EXPIRED (2) ——
   {
     id: '1',
     userId: 'demo-user',
     name: 'Niacinamide 10% + Zinc',
     brand: 'The Ordinary',
     category: 'skincare',
-    expirationDate: new Date('2025-01-10'), // Expired
-    purchaseDate: new Date('2024-06-01'),
-    openedDate: new Date('2024-06-15'),
+    expirationDate: daysFromNow(-8),
+    purchaseDate: baseCreated(120),
+    openedDate: baseCreated(105),
     paoMonths: 6,
     location: 'Bathroom Cabinet',
     photoUrl: 'https://images.unsplash.com/photo-1556228578-0d85b1a4d571?w=400',
     usageCount: 42,
     notes: 'Great for reducing pores and oil control',
-    createdAt: new Date('2024-06-01'),
-    updatedAt: new Date('2024-06-01'),
+    createdAt: baseCreated(120),
+    updatedAt: baseCreated(120),
   },
   {
     id: '2',
@@ -30,51 +45,51 @@ const mockProducts: Product[] = [
     name: 'Matte Lipstick',
     brand: 'MAC Cosmetics',
     category: 'makeup',
-    expirationDate: new Date('2025-01-05'), // Expired
-    purchaseDate: new Date('2024-08-15'),
-    openedDate: new Date('2024-08-20'),
+    expirationDate: daysFromNow(-3),
+    purchaseDate: baseCreated(90),
+    openedDate: baseCreated(85),
     paoMonths: 12,
     location: 'Makeup Bag',
     photoUrl: 'https://images.unsplash.com/photo-1583241800619-2d0d3e07b4c5?w=400',
     usageCount: 25,
     notes: 'Ruby Woo shade - favorite red',
-    createdAt: new Date('2024-08-15'),
-    updatedAt: new Date('2024-08-15'),
+    createdAt: baseCreated(90),
+    updatedAt: baseCreated(90),
   },
-  // 3 EXPIRING SOON products
+  // —— EXPIRING SOON (within 30 days) ——
   {
     id: '3',
     userId: 'demo-user',
-    name: 'Hyaluronic Acid Serum',
+    name: 'Hyaluronic Acid 2% + B5',
     brand: 'The Ordinary',
     category: 'skincare',
-    expirationDate: new Date('2026-02-12'), // Expiring soon (within 30 days)
-    purchaseDate: new Date('2025-11-01'),
-    openedDate: new Date('2025-11-10'),
+    expirationDate: daysFromNow(5),
+    purchaseDate: baseCreated(60),
+    openedDate: baseCreated(55),
     paoMonths: 6,
     location: 'Bathroom Cabinet',
     photoUrl: 'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=400',
     usageCount: 18,
     notes: 'Apply on damp skin for best results',
-    createdAt: new Date('2025-11-01'),
-    updatedAt: new Date('2025-11-01'),
+    createdAt: baseCreated(60),
+    updatedAt: baseCreated(60),
   },
   {
     id: '4',
     userId: 'demo-user',
     name: 'Volume Mascara',
-    brand: 'L\'Oréal',
+    brand: "L'Oréal",
     category: 'makeup',
-    expirationDate: new Date('2026-02-20'), // Expiring soon
-    purchaseDate: new Date('2025-10-15'),
-    openedDate: new Date('2025-10-18'),
+    expirationDate: daysFromNow(12),
+    purchaseDate: baseCreated(70),
+    openedDate: baseCreated(67),
     paoMonths: 3,
     location: 'Makeup Bag',
     photoUrl: 'https://images.unsplash.com/photo-1631210867761-65e61b0eab3c?w=400',
     usageCount: 60,
     notes: 'Waterproof formula',
-    createdAt: new Date('2025-10-15'),
-    updatedAt: new Date('2025-10-15'),
+    createdAt: baseCreated(70),
+    updatedAt: baseCreated(70),
   },
   {
     id: '5',
@@ -82,85 +97,85 @@ const mockProducts: Product[] = [
     name: 'Repairing Shampoo',
     brand: 'Olaplex',
     category: 'haircare',
-    expirationDate: new Date('2026-02-25'), // Expiring soon
-    purchaseDate: new Date('2025-09-20'),
-    openedDate: new Date('2025-09-25'),
+    expirationDate: daysFromNow(18),
+    purchaseDate: baseCreated(80),
+    openedDate: baseCreated(75),
     paoMonths: 12,
     location: 'Shower',
     photoUrl: 'https://images.unsplash.com/photo-1556228720-195a672e8a03?w=400',
     usageCount: 35,
     notes: 'For damaged hair - use weekly',
-    createdAt: new Date('2025-09-20'),
-    updatedAt: new Date('2025-09-20'),
+    createdAt: baseCreated(80),
+    updatedAt: baseCreated(80),
   },
-  // 5 SAFE products
   {
     id: '6',
+    userId: 'demo-user',
+    name: 'Cicaplast Baume B5',
+    brand: 'La Roche-Posay',
+    category: 'skincare',
+    expirationDate: daysFromNow(25),
+    purchaseDate: baseCreated(45),
+    openedDate: baseCreated(42),
+    paoMonths: 6,
+    location: 'Bathroom Cabinet',
+    photoUrl: 'https://images.unsplash.com/photo-1612817288484-6f916006741a?w=400',
+    usageCount: 22,
+    notes: 'Soothing repair balm',
+    createdAt: baseCreated(45),
+    updatedAt: baseCreated(45),
+  },
+  {
+    id: '7',
+    userId: 'demo-user',
+    name: 'Glow Recipe Watermelon Glow Niacinamide Dew Drops',
+    brand: 'Glow Recipe',
+    category: 'skincare',
+    expirationDate: daysFromNow(30),
+    purchaseDate: baseCreated(50),
+    openedDate: baseCreated(48),
+    paoMonths: 12,
+    location: 'Bathroom Shelf',
+    photoUrl: 'https://images.unsplash.com/photo-1571781926291-c477ebfd024b?w=400',
+    usageCount: 15,
+    notes: 'Lightweight serum for glow',
+    createdAt: baseCreated(50),
+    updatedAt: baseCreated(50),
+  },
+  // —— SAFE (rest) ——
+  {
+    id: '8',
     userId: 'demo-user',
     name: 'Vitamin C Brightening Serum',
     brand: 'CeraVe',
     category: 'skincare',
-    expirationDate: new Date('2026-08-15'), // Safe
-    purchaseDate: new Date('2025-12-01'),
-    openedDate: new Date('2025-12-05'),
+    expirationDate: daysFromNow(90),
+    purchaseDate: baseCreated(30),
+    openedDate: baseCreated(26),
     paoMonths: 6,
     location: 'Bathroom Cabinet',
     photoUrl: 'https://images.unsplash.com/photo-1571781926291-c477ebfd024b?w=400',
     usageCount: 12,
     notes: 'Use in morning routine',
-    createdAt: new Date('2025-12-01'),
-    updatedAt: new Date('2025-12-01'),
+    createdAt: baseCreated(30),
+    updatedAt: baseCreated(30),
   },
   {
-    id: '7',
-    userId: 'demo-user',
-    name: 'Retinol Night Cream',
-    brand: 'La Roche-Posay',
-    category: 'skincare',
-    expirationDate: new Date('2026-09-20'), // Safe
-    purchaseDate: new Date('2025-11-15'),
-    openedDate: new Date('2025-11-20'),
-    paoMonths: 12,
-    location: 'Bedroom Drawer',
-    photoUrl: 'https://images.unsplash.com/photo-1612817288484-6f916006741a?w=400',
-    usageCount: 20,
-    notes: 'Apply before bed',
-    createdAt: new Date('2025-11-15'),
-    updatedAt: new Date('2025-11-15'),
-  },
-  {
-    id: '8',
+    id: '9',
     userId: 'demo-user',
     name: 'Chance Eau de Parfum',
     brand: 'Chanel',
     category: 'fragrance',
-    expirationDate: new Date('2027-06-10'), // Safe
-    purchaseDate: new Date('2025-08-10'),
-    openedDate: new Date('2025-08-12'),
+    expirationDate: daysFromNow(180),
+    purchaseDate: baseCreated(100),
+    openedDate: baseCreated(98),
     paoMonths: 36,
     location: 'Dresser Top',
     photoUrl: 'https://images.unsplash.com/photo-1541643600914-78b084683601?w=400',
     usageCount: 8,
     notes: 'Evening wear',
-    createdAt: new Date('2025-08-10'),
-    updatedAt: new Date('2025-08-10'),
-  },
-  {
-    id: '9',
-    userId: 'demo-user',
-    name: 'Daily Moisturizer SPF 30',
-    brand: 'Neutrogena',
-    category: 'skincare',
-    expirationDate: new Date('2026-10-05'), // Safe
-    purchaseDate: new Date('2025-11-01'),
-    openedDate: new Date('2025-11-02'),
-    paoMonths: 12,
-    location: 'Bathroom Cabinet',
-    photoUrl: 'https://images.unsplash.com/photo-1556228578-0d85b1a4d571?w=400',
-    usageCount: 45,
-    notes: 'Daily essential',
-    createdAt: new Date('2025-11-01'),
-    updatedAt: new Date('2025-11-01'),
+    createdAt: baseCreated(100),
+    updatedAt: baseCreated(100),
   },
   {
     id: '10',
@@ -168,16 +183,16 @@ const mockProducts: Product[] = [
     name: 'Nourishing Hair Mask',
     brand: 'Moroccanoil',
     category: 'haircare',
-    expirationDate: new Date('2026-11-18'), // Safe
-    purchaseDate: new Date('2025-10-20'),
-    openedDate: new Date('2025-10-25'),
+    expirationDate: daysFromNow(200),
+    purchaseDate: baseCreated(60),
+    openedDate: baseCreated(55),
     paoMonths: 24,
     location: 'Shower',
     photoUrl: 'https://images.unsplash.com/photo-1522338242992-e1a54906a8da?w=400',
     usageCount: 5,
     notes: 'Deep conditioning treatment',
-    createdAt: new Date('2025-10-20'),
-    updatedAt: new Date('2025-10-20'),
+    createdAt: baseCreated(60),
+    updatedAt: baseCreated(60),
   },
 ];
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, TextInput, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, TextInput, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 interface SearchBarProps {
@@ -8,6 +8,8 @@ interface SearchBarProps {
   placeholder?: string;
   onFilterPress?: () => void;
   onSortPress?: () => void;
+  /** When set, show a single "Filter & sort" button instead of separate filter/sort icons. */
+  filterSortLabel?: string;
   testID?: string;
 }
 
@@ -17,8 +19,12 @@ export default function SearchBar({
   placeholder = 'Search products...',
   onFilterPress,
   onSortPress,
+  filterSortLabel,
   testID,
 }: SearchBarProps) {
+  const openFilterSort = onFilterPress ?? onSortPress;
+  const showSingleFilterSort = filterSortLabel && openFilterSort;
+
   return (
     <View style={styles.container} testID={testID}>
       <View style={styles.searchInputContainer}>
@@ -41,23 +47,36 @@ export default function SearchBar({
           </TouchableOpacity>
         )}
       </View>
-      {onFilterPress && (
+      {showSingleFilterSort ? (
         <TouchableOpacity
-          style={styles.actionButton}
-          onPress={onFilterPress}
-          testID="filter-button"
+          style={styles.filterSortButton}
+          onPress={openFilterSort}
+          testID="filter-sort-button"
         >
-          <Ionicons name="options" size={20} color="#10b981" />
+          <Ionicons name="options-outline" size={18} color="#10b981" style={styles.filterSortIcon} />
+          <Text style={styles.filterSortLabel}>{filterSortLabel}</Text>
         </TouchableOpacity>
-      )}
-      {onSortPress && (
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={onSortPress}
-          testID="sort-button"
-        >
-          <Ionicons name="swap-vertical" size={20} color="#10b981" />
-        </TouchableOpacity>
+      ) : (
+        <>
+          {onFilterPress && (
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={onFilterPress}
+              testID="filter-button"
+            >
+              <Ionicons name="options" size={20} color="#10b981" />
+            </TouchableOpacity>
+          )}
+          {onSortPress && (
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={onSortPress}
+              testID="sort-button"
+            >
+              <Ionicons name="swap-vertical" size={20} color="#10b981" />
+            </TouchableOpacity>
+          )}
+        </>
       )}
     </View>
   );
@@ -99,5 +118,22 @@ const styles = StyleSheet.create({
     backgroundColor: '#f0fdf4',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  filterSortButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 44,
+    paddingHorizontal: 12,
+    borderRadius: 22,
+    backgroundColor: '#f0fdf4',
+    minWidth: 44,
+  },
+  filterSortIcon: {
+    marginRight: 6,
+  },
+  filterSortLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#10b981',
   },
 });

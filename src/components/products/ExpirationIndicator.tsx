@@ -27,7 +27,7 @@ export default function ExpirationIndicator({
       case ExpirationStatus.EXPIRED:
         return { color: '#ef4444', bgColor: '#fee2e2', text: 'Expired' };
       case ExpirationStatus.EXPIRING_SOON:
-        return { color: '#f97316', bgColor: '#fed7aa', text: 'Expiring Soon' };
+        return { color: '#f97316', bgColor: '#fed7aa', text: 'Expiring' };
       case ExpirationStatus.WARNING:
         return { color: '#fbbf24', bgColor: '#fef3c7', text: 'Warning' };
       case ExpirationStatus.SAFE:

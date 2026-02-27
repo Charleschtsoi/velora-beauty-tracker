@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,11 +8,15 @@ import {
   Switch,
   Alert,
   Linking,
+  Platform,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import * as settingsStorage from '../services/settingsStorage';
 
 interface SettingsSectionProps {
   title: string;
@@ -78,16 +82,37 @@ function SettingsItem({
 
 export default function SettingsScreen() {
   const navigation = useNavigation<any>();
-  
-  // Settings state
+
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [expiringSoonAlert, setExpiringSoonAlert] = useState(true);
   const [expiredAlert, setExpiredAlert] = useState(true);
   const [reminderTime, setReminderTime] = useState('9:00 AM');
-  const [darkMode, setDarkMode] = useState(false);
+  const [timePickerVisible, setTimePickerVisible] = useState(false);
+  const [tempTime, setTempTime] = useState(() => {
+    const d = new Date();
+    d.setHours(9, 0, 0, 0);
+    return d;
+  });
 
-  // Mock user data (in real app, get from auth context)
   const userEmail = 'user@example.com';
+
+  useEffect(() => {
+    (async () => {
+      const [notif, soon, expired] = await Promise.all([
+        settingsStorage.getNotificationsEnabled(),
+        settingsStorage.getExpiringSoonAlert(),
+        settingsStorage.getExpiredAlert(),
+      ]);
+      setNotificationsEnabled(notif);
+      setExpiringSoonAlert(soon);
+      setExpiredAlert(expired);
+      const { hour, minute } = await settingsStorage.getReminderTime();
+      setReminderTime(settingsStorage.formatReminderTime(hour, minute));
+      const d = new Date();
+      d.setHours(hour, minute, 0, 0);
+      setTempTime(d);
+    })();
+  }, []);
 
   const handleLogout = () => {
     Alert.alert(
@@ -117,12 +142,39 @@ export default function SettingsScreen() {
   };
 
   const handleReminderTimePress = () => {
-    // TODO: Open time picker
-    Alert.alert('Reminder Time', 'Time picker will be implemented here');
+    setTempTime((prev) => {
+      const parsed = settingsStorage.parseReminderTimeDisplay(reminderTime);
+      const d = new Date();
+      d.setHours(parsed.hour, parsed.minute, 0, 0);
+      return d;
+    });
+    setTimePickerVisible(true);
+  };
+
+  const handleTimePickerChange = (_event: any, selectedDate?: Date) => {
+    if (Platform.OS === 'android') {
+      setTimePickerVisible(false);
+      if (selectedDate) {
+        const hour = selectedDate.getHours();
+        const minute = selectedDate.getMinutes();
+        settingsStorage.setReminderTime(hour, minute);
+        setReminderTime(settingsStorage.formatReminderTime(hour, minute));
+      }
+    } else if (selectedDate) {
+      setTempTime(selectedDate);
+    }
+  };
+
+  const handleTimePickerConfirm = () => {
+    const hour = tempTime.getHours();
+    const minute = tempTime.getMinutes();
+    settingsStorage.setReminderTime(hour, minute);
+    setReminderTime(settingsStorage.formatReminderTime(hour, minute));
+    setTimePickerVisible(false);
   };
 
   const handleSupportPress = () => {
-    Linking.openURL('mailto:support@hermes.app?subject=Hermes App Support');
+    Linking.openURL('mailto:charleschtsoi@gmail.com?subject=Velora App Support');
   };
 
   const handlePrivacyPress = () => {
@@ -174,12 +226,15 @@ export default function SettingsScreen() {
           <SettingsItem
             icon="notifications"
             iconColor="#10b981"
-            title="Push Notifications"
-            subtitle="Receive alerts for expiring products"
+            title="Reminder notifications"
+            subtitle="Get reminder notifications when products are about to expire"
             rightComponent={
               <Switch
                 value={notificationsEnabled}
-                onValueChange={setNotificationsEnabled}
+                onValueChange={(v) => {
+                  setNotificationsEnabled(v);
+                  settingsStorage.setNotificationsEnabled(v);
+                }}
                 trackColor={{ false: '#d1d5db', true: '#10b981' }}
                 thumbColor="#ffffff"
                 testID="notifications-toggle"
@@ -193,12 +248,15 @@ export default function SettingsScreen() {
               <SettingsItem
                 icon="warning"
                 iconColor="#f97316"
-                title="Expiring Soon Alerts"
-                subtitle="Get notified when products expire in 1-3 days"
+                title="Expiring soon reminders"
+                subtitle="Remind me when products expire in 1–3 days"
                 rightComponent={
                   <Switch
                     value={expiringSoonAlert}
-                    onValueChange={setExpiringSoonAlert}
+                    onValueChange={(v) => {
+                      setExpiringSoonAlert(v);
+                      settingsStorage.setExpiringSoonAlert(v);
+                    }}
                     trackColor={{ false: '#d1d5db', true: '#f97316' }}
                     thumbColor="#ffffff"
                     testID="expiring-soon-toggle"
@@ -214,7 +272,10 @@ export default function SettingsScreen() {
                 rightComponent={
                   <Switch
                     value={expiredAlert}
-                    onValueChange={setExpiredAlert}
+                    onValueChange={(v) => {
+                      setExpiredAlert(v);
+                      settingsStorage.setExpiredAlert(v);
+                    }}
                     trackColor={{ false: '#d1d5db', true: '#ef4444' }}
                     thumbColor="#ffffff"
                     testID="expired-alert-toggle"
@@ -232,26 +293,6 @@ export default function SettingsScreen() {
               />
             </>
           )}
-        </SettingsSection>
-
-        {/* Appearance Section */}
-        <SettingsSection title="Appearance">
-          <SettingsItem
-            icon="moon"
-            iconColor="#6b7280"
-            title="Dark Mode"
-            subtitle="Switch to dark theme"
-            rightComponent={
-              <Switch
-                value={darkMode}
-                onValueChange={setDarkMode}
-                trackColor={{ false: '#d1d5db', true: '#10b981' }}
-                thumbColor="#ffffff"
-                testID="dark-mode-toggle"
-              />
-            }
-            showArrow={false}
-          />
         </SettingsSection>
 
         {/* About Section */}
@@ -290,11 +331,51 @@ export default function SettingsScreen() {
 
         {/* Footer */}
         <View style={styles.footer}>
-          <Text style={styles.footerText}>Hermes</Text>
+          <Text style={styles.footerText}>Velora</Text>
           <Text style={styles.footerSubtext}>Beauty Product Expiration Tracker</Text>
           <Text style={styles.footerVersion}>Version {appVersion}</Text>
         </View>
       </ScrollView>
+
+      {/* Reminder time picker */}
+      {Platform.OS === 'ios' ? (
+        <Modal
+          visible={timePickerVisible}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setTimePickerVisible(false)}
+        >
+          <View style={styles.timePickerOverlay}>
+            <View style={styles.timePickerContent}>
+              <View style={styles.timePickerHeader}>
+                <TouchableOpacity onPress={() => setTimePickerVisible(false)} style={styles.timePickerButton}>
+                  <Text style={styles.timePickerButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                <Text style={styles.timePickerTitle}>Reminder time</Text>
+                <TouchableOpacity onPress={handleTimePickerConfirm} style={styles.timePickerButton}>
+                  <Text style={[styles.timePickerButtonText, styles.timePickerButtonConfirm]}>Done</Text>
+                </TouchableOpacity>
+              </View>
+              <DateTimePicker
+                value={tempTime}
+                mode="time"
+                display="spinner"
+                onChange={handleTimePickerChange}
+                themeVariant="light"
+              />
+            </View>
+          </View>
+        </Modal>
+      ) : (
+        timePickerVisible && (
+          <DateTimePicker
+            value={tempTime}
+            mode="time"
+            display="default"
+            onChange={handleTimePickerChange}
+          />
+        )
+      )}
     </SafeAreaView>
   );
 }
@@ -393,5 +474,42 @@ const styles = StyleSheet.create({
   footerVersion: {
     fontSize: 12,
     color: '#9ca3af',
+  },
+  timePickerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  timePickerContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
+    paddingBottom: 24,
+  },
+  timePickerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  timePickerTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1f2937',
+  },
+  timePickerButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+  },
+  timePickerButtonText: {
+    fontSize: 16,
+    color: '#6b7280',
+  },
+  timePickerButtonConfirm: {
+    color: '#10b981',
+    fontWeight: '600',
   },
 });

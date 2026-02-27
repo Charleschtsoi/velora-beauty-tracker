@@ -7,7 +7,7 @@ interface ProductContextType {
   loading: boolean;
   error: string | null;
   fetchProducts: () => Promise<void>;
-  addProduct: (product: Omit<Product, 'id' | 'createdAt' | 'updatedAt' | 'userId'>) => Promise<void>;
+  addProduct: (product: Omit<Product, 'id' | 'createdAt' | 'updatedAt' | 'userId'>) => Promise<Product | void>;
   updateProduct: (id: string, updates: Partial<Product>) => Promise<void>;
   deleteProduct: (id: string) => Promise<void>;
 }
@@ -36,7 +36,7 @@ export const ProductProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const addProduct = async (product: Omit<Product, 'id' | 'createdAt' | 'updatedAt' | 'userId'>) => {
+  const addProduct = async (product: Omit<Product, 'id' | 'createdAt' | 'updatedAt' | 'userId'>): Promise<Product | void> => {
     setLoading(true);
     setError(null);
     try {
@@ -50,6 +50,7 @@ export const ProductProvider = ({ children }: { children: ReactNode }) => {
         updatedAt: new Date(),
       };
       setProducts([newProduct, ...products]);
+      return newProduct;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to add product';
       setError(errorMessage);

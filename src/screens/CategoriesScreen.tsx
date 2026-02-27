@@ -15,6 +15,7 @@ import { ProductCategory } from '../types/product.types';
 import { getExpirationStatus } from '../utils/dateHelpers';
 import { ExpirationStatus } from '../types/product.types';
 import ProductCard from '../components/products/ProductCard';
+import EmptyState from '../components/common/EmptyState';
 
 const categoryConfig: Record<ProductCategory, { label: string; icon: keyof typeof Ionicons.glyphMap; color: string }> = {
   [ProductCategory.SKINCARE]: {
@@ -104,13 +105,12 @@ export default function CategoriesScreen() {
   }, [products]);
 
   const handleCategoryPress = (category: ProductCategory) => {
-    // Navigate to Inventory with category filter
-    // Note: InventoryScreen will need to handle category filter from route params
-    navigation.navigate('Inventory', { categoryFilter: category });
+    // Navigate to MainTabs > Inventory with category filter (Inventory is inside tab navigator)
+    navigation.navigate('MainTabs', { screen: 'Inventory', params: { categoryFilter: category } });
   };
 
   const handleProductPress = (productId: string) => {
-    navigation.navigate('ProductDetail', { productId });
+    navigation.getParent()?.navigate('ProductDetail' as never, { productId });
   };
 
   if (loading && products.length === 0) {
@@ -128,7 +128,15 @@ export default function CategoriesScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+          testID="categories-back-button"
+        >
+          <Ionicons name="arrow-back" size={24} color="#1f2937" />
+        </TouchableOpacity>
         <Text style={styles.headerTitle}>Categories</Text>
+        <View style={styles.headerRight} />
       </View>
 
       <ScrollView
@@ -215,13 +223,11 @@ export default function CategoriesScreen() {
         })}
 
         {products.length === 0 && (
-          <View style={styles.emptyState}>
-            <Ionicons name="grid-outline" size={64} color="#d1d5db" />
-            <Text style={styles.emptyTitle}>No products yet</Text>
-            <Text style={styles.emptyText}>
-              Add products to see them organized by category
-            </Text>
-          </View>
+          <EmptyState
+            icon="grid-outline"
+            title="No products yet"
+            subtitle="Add your first product to see your collection by category"
+          />
         )}
       </ScrollView>
     </SafeAreaView>
@@ -244,16 +250,31 @@ const styles = StyleSheet.create({
     color: '#6b7280',
   },
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
     backgroundColor: '#ffffff',
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
   },
+  backButton: {
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: -8,
+  },
   headerTitle: {
     fontSize: 20,
     fontWeight: '600',
     color: '#1f2937',
+    flex: 1,
+    textAlign: 'center',
+  },
+  headerRight: {
+    width: 44,
   },
   scrollView: {
     flex: 1,
@@ -361,24 +382,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#10b981',
-  },
-  emptyState: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 60,
-    paddingHorizontal: 40,
-  },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#1f2937',
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  emptyText: {
-    fontSize: 14,
-    color: '#6b7280',
-    textAlign: 'center',
-    lineHeight: 20,
   },
 });

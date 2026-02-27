@@ -1,6 +1,7 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
+import { colors, spacing } from '../theme';
 import HomeScreen from '../screens/HomeScreen';
 import ScanScreen from '../screens/ScanScreen';
 import InventoryScreen from '../screens/InventoryScreen';
@@ -15,20 +16,20 @@ export default function TabNavigator() {
   return (
     <Tab.Navigator
       screenOptions={{
-        tabBarActiveTintColor: '#10b981', // Soft green
-        tabBarInactiveTintColor: '#9ca3af',
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.textTertiary,
         tabBarStyle: {
-          backgroundColor: '#ffffff',
-          borderTopColor: '#e5e7eb',
+          backgroundColor: colors.surface,
+          borderTopColor: colors.border,
           borderTopWidth: 1,
-          paddingBottom: 5,
-          paddingTop: 5,
+          paddingBottom: spacing.xxs,
+          paddingTop: spacing.xxs,
           height: 60,
         },
         headerStyle: {
-          backgroundColor: '#ffffff',
+          backgroundColor: colors.surface,
         },
-        headerTintColor: '#1f2937',
+        headerTintColor: colors.textPrimary,
         headerTitleStyle: {
           fontWeight: '600',
         },
@@ -38,7 +39,7 @@ export default function TabNavigator() {
         name="Home"
         component={HomeScreen}
         options={{
-          headerShown: true,
+          headerShown: false,
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="home" size={size} color={color} />
           ),
@@ -49,9 +50,9 @@ export default function TabNavigator() {
         component={ScanScreen}
         options={{
           headerShown: true,
-          headerTitle: 'Scan Product',
+          headerTitle: 'Scan or add product',
           headerTitleStyle: {
-            color: '#10b981',
+            color: colors.primary,
             fontWeight: '600',
           },
           tabBarIcon: ({ color, size }) => (
@@ -74,6 +75,7 @@ export default function TabNavigator() {
         component={NotificationsScreen}
         options={{
           headerShown: false,
+          tabBarLabel: 'Reminders',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="notifications" size={size} color={color} />
           ),

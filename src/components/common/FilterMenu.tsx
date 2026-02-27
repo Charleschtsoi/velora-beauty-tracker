@@ -6,9 +6,11 @@ import {
   Modal,
   TouchableOpacity,
   FlatList,
+  Switch,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { ProductCategory, ExpirationStatus } from '../../types/product.types';
+import { colors, spacing, radius, typography } from '../../theme';
 
 export type SortOption = 'expiry_date' | 'name' | 'recently_added';
 export type StatusFilter = ExpirationStatus | 'all';
@@ -23,6 +25,8 @@ interface FilterMenuProps {
   onStatusFilterChange: (filter: StatusFilter) => void;
   categoryFilter: CategoryFilter;
   onCategoryFilterChange: (filter: CategoryFilter) => void;
+  compactList?: boolean;
+  onCompactListChange?: (value: boolean) => void;
 }
 
 const sortOptions = [
@@ -59,6 +63,8 @@ export default function FilterMenu({
   onStatusFilterChange,
   categoryFilter,
   onCategoryFilterChange,
+  compactList = false,
+  onCompactListChange,
 }: FilterMenuProps) {
   const [activeTab, setActiveTab] = useState<'sort' | 'status' | 'category'>('sort');
 
@@ -75,7 +81,7 @@ export default function FilterMenu({
       <Text style={[styles.optionText, isSelected && styles.optionTextSelected]}>
         {label}
       </Text>
-      {isSelected && <Ionicons name="checkmark" size={20} color="#10b981" />}
+      {isSelected && <Ionicons name="checkmark" size={20} color={colors.primary} />}
     </TouchableOpacity>
   );
 
@@ -95,7 +101,7 @@ export default function FilterMenu({
           <View style={styles.header}>
             <Text style={styles.title}>Filter & Sort</Text>
             <TouchableOpacity onPress={onClose}>
-              <Ionicons name="close" size={24} color="#1f2937" />
+              <Ionicons name="close" size={24} color={colors.textPrimary} />
             </TouchableOpacity>
           </View>
 
@@ -178,6 +184,18 @@ export default function FilterMenu({
               />
             )}
           </View>
+
+          {onCompactListChange != null && (
+            <View style={styles.compactRow}>
+              <Text style={styles.compactLabel}>Compact list</Text>
+              <Switch
+                value={compactList}
+                onValueChange={onCompactListChange}
+                trackColor={{ false: colors.border, true: colors.primary }}
+                thumbColor={colors.white}
+              />
+            </View>
+          )}
         </View>
       </TouchableOpacity>
     </Modal>
@@ -191,71 +209,83 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#ffffff',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: radius.lg,
+    borderTopRightRadius: radius.lg,
     maxHeight: '80%',
-    paddingBottom: 20,
+    paddingBottom: spacing.lg,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
+    padding: spacing.lg,
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    borderBottomColor: colors.border,
   },
   title: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#1f2937',
+    ...typography.title,
+    color: colors.textPrimary,
   },
   tabs: {
     flexDirection: 'row',
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    borderBottomColor: colors.border,
   },
   tab: {
     flex: 1,
-    paddingVertical: 12,
+    paddingVertical: spacing.sm,
     alignItems: 'center',
     borderBottomWidth: 2,
     borderBottomColor: 'transparent',
   },
   tabActive: {
-    borderBottomColor: '#10b981',
+    borderBottomColor: colors.primary,
   },
   tabText: {
-    fontSize: 14,
+    ...typography.body,
     fontWeight: '500',
-    color: '#6b7280',
+    color: colors.textSecondary,
   },
   tabTextActive: {
-    color: '#10b981',
+    color: colors.primary,
     fontWeight: '600',
   },
   content: {
     maxHeight: 400,
-    padding: 16,
+    padding: spacing.lg,
   },
   option: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    marginBottom: 8,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radius.sm,
+    marginBottom: spacing.sm,
   },
   optionSelected: {
-    backgroundColor: '#f0fdf4',
+    backgroundColor: colors.primaryTint,
   },
   optionText: {
-    fontSize: 16,
-    color: '#1f2937',
+    ...typography.bodyLarge,
+    color: colors.textPrimary,
   },
   optionTextSelected: {
-    color: '#10b981',
+    color: colors.primary,
     fontWeight: '600',
+  },
+  compactRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  compactLabel: {
+    ...typography.bodyLarge,
+    color: colors.textPrimary,
   },
 });

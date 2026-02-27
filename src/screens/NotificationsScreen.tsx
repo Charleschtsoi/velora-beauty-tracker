@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,9 @@ import { useProducts } from '../context/ProductContext';
 import { Product } from '../types/product.types';
 import { getDaysUntilExpiration } from '../utils/dateHelpers';
 import NotificationCard from '../components/notifications/NotificationCard';
+import EmptyState from '../components/common/EmptyState';
+import { colors, spacing, radius, typography } from '../theme';
+import * as settingsStorage from '../services/settingsStorage';
 
 interface NotificationGroup {
   title: string;
@@ -27,8 +30,24 @@ export default function NotificationsScreen() {
   const navigation = useNavigation<any>();
   const { products, loading } = useProducts();
   const [readNotifications, setReadNotifications] = useState<Set<string>>(new Set());
+  const [expiredAlert, setExpiredAlert] = useState(true);
+  const [expiringSoonAlert, setExpiringSoonAlert] = useState(true);
 
-  // Group products by expiration urgency
+  useEffect(() => {
+    Promise.all([
+      settingsStorage.getExpiredAlert(),
+      settingsStorage.getExpiringSoonAlert(),
+    ]).then(([expired, soon]) => {
+      setExpiredAlert(expired);
+      setExpiringSoonAlert(soon);
+    });
+  }, []);
+
+  useEffect(() => {
+    settingsStorage.getReadReminderIds().then(setReadNotifications);
+  }, []);
+
+  // Group products by expiration urgency; hide groups when user turned off in Settings
   const notificationGroups = useMemo(() => {
     const groups: NotificationGroup[] = [
       {
@@ -51,22 +70,19 @@ export default function NotificationsScreen() {
       },
     ];
 
+    if (!expiredAlert && !expiringSoonAlert) return [];
+
     products.forEach((product) => {
       const daysUntil = getDaysUntilExpiration(product.expirationDate);
-      
-      if (daysUntil < 0) {
-        // Expired
+      if (daysUntil < 0 && expiredAlert) {
         groups[0].products.push(product);
-      } else if (daysUntil === 0 || daysUntil === 1) {
-        // Expiring today or in 1 day
+      } else if ((daysUntil === 0 || daysUntil === 1) && expiringSoonAlert) {
         groups[1].products.push(product);
-      } else if (daysUntil <= 3) {
-        // Expiring in 2-3 days
+      } else if (daysUntil <= 3 && expiringSoonAlert) {
         groups[2].products.push(product);
       }
     });
 
-    // Sort products within each group by days until expiration
     groups.forEach((group) => {
       group.products.sort((a, b) => {
         const daysA = getDaysUntilExpiration(a.expirationDate);
@@ -75,22 +91,25 @@ export default function NotificationsScreen() {
       });
     });
 
-    // Only return groups that have products
     return groups.filter((group) => group.products.length > 0);
-  }, [products]);
+  }, [products, expiredAlert, expiringSoonAlert]);
 
   const handleProductPress = (productId: string) => {
-    navigation.navigate('ProductDetail', { productId });
+    navigation.getParent()?.navigate('ProductDetail' as never, { productId });
   };
 
   const handleMarkAsRead = (productId: string) => {
-    setReadNotifications((prev) => new Set(prev).add(productId));
+    setReadNotifications((prev) => {
+      const next = new Set(prev).add(productId);
+      settingsStorage.setReadReminderIds(Array.from(next));
+      return next;
+    });
   };
 
   const handleClearAll = () => {
     Alert.alert(
-      'Clear All Notifications',
-      'Are you sure you want to mark all notifications as read?',
+      'Clear all reminders',
+      'Mark all reminders as read?',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -99,6 +118,7 @@ export default function NotificationsScreen() {
             const allProductIds = notificationGroups
               .flatMap((group) => group.products.map((p) => p.id));
             setReadNotifications(new Set(allProductIds));
+            settingsStorage.setReadReminderIds(allProductIds);
           },
         },
       ]
@@ -112,24 +132,22 @@ export default function NotificationsScreen() {
   };
 
   const renderEmptyState = () => (
-    <View style={styles.emptyState}>
-      <Ionicons name="notifications-off-outline" size={64} color="#d1d5db" />
-      <Text style={styles.emptyTitle}>No Expiration Alerts</Text>
-      <Text style={styles.emptyText}>
-        All your products are safe! You'll see notifications here when products are about to expire.
-      </Text>
-    </View>
+    <EmptyState
+      icon="notifications-off-outline"
+      title="No expiration alerts"
+      subtitle="All your products are safe! You'll see reminders here when products are about to expire."
+    />
   );
 
   if (loading && products.length === 0) {
-    return (
-      <SafeAreaView style={styles.container} edges={['top']}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#10b981" />
-          <Text style={styles.loadingText}>Loading notifications...</Text>
-        </View>
-      </SafeAreaView>
-    );
+  return (
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={styles.loadingText}>Loading reminders...</Text>
+      </View>
+    </SafeAreaView>
+  );
   }
 
   return (
@@ -137,8 +155,8 @@ export default function NotificationsScreen() {
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <Ionicons name="notifications" size={24} color="#10b981" />
-          <Text style={styles.headerTitle}>Notifications</Text>
+          <Ionicons name="notifications" size={24} color={colors.primary} />
+          <Text style={styles.headerTitle}>Reminders</Text>
           {getTotalUnreadCount() > 0 && (
             <View style={styles.badge}>
               <Text style={styles.badgeText}>{getTotalUnreadCount()}</Text>
@@ -216,7 +234,7 @@ export default function NotificationsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f9fafb',
+    backgroundColor: colors.background,
   },
   loadingContainer: {
     flex: 1,
@@ -224,73 +242,72 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: '#6b7280',
+    marginTop: spacing.sm,
+    ...typography.bodyLarge,
+    color: colors.textSecondary,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#ffffff',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    backgroundColor: colors.surface,
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    borderBottomColor: colors.border,
   },
   headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: spacing.sm,
   },
   headerTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#1f2937',
+    ...typography.title,
+    color: colors.textPrimary,
   },
   badge: {
-    backgroundColor: '#ef4444',
-    borderRadius: 10,
+    backgroundColor: colors.statusExpired,
+    borderRadius: radius.sm,
     minWidth: 20,
     height: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 6,
+    paddingHorizontal: spacing.xs,
   },
   badgeText: {
-    color: '#ffffff',
-    fontSize: 12,
+    color: colors.white,
+    ...typography.caption,
     fontWeight: '700',
   },
   clearButton: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
   },
   clearButtonText: {
-    fontSize: 14,
+    ...typography.body,
     fontWeight: '600',
-    color: '#10b981',
+    color: colors.primary,
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    padding: 16,
-    paddingBottom: 32,
+    padding: spacing.lg,
+    paddingBottom: spacing.xl,
   },
   emptyScrollContent: {
     flex: 1,
   },
   groupContainer: {
-    marginBottom: 24,
+    marginBottom: spacing.lg,
   },
   groupHeader: {
-    marginBottom: 12,
+    marginBottom: spacing.sm,
   },
   groupHeaderLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: spacing.sm,
   },
   groupIconContainer: {
     width: 32,
@@ -300,40 +317,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   groupTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1f2937',
+    ...typography.subtitle,
+    color: colors.textPrimary,
     flex: 1,
   },
   groupBadge: {
-    backgroundColor: '#e5e7eb',
-    borderRadius: 12,
-    paddingHorizontal: 8,
+    backgroundColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.sm,
     paddingVertical: 2,
   },
   groupBadgeText: {
-    fontSize: 12,
+    ...typography.caption,
     fontWeight: '600',
-    color: '#6b7280',
-  },
-  emptyState: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 40,
-    paddingVertical: 60,
-  },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#1f2937',
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  emptyText: {
-    fontSize: 14,
-    color: '#6b7280',
-    textAlign: 'center',
-    lineHeight: 20,
+    color: colors.textSecondary,
   },
 });
