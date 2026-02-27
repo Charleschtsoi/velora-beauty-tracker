@@ -4,10 +4,19 @@ import TabNavigator from './TabNavigator';
 import AddProductScreen from '../screens/AddProductScreen';
 import ProductDetailScreen from '../screens/ProductDetailScreen';
 import CategoriesScreen from '../screens/CategoriesScreen';
+import type { AIFieldMap, AIFieldKey } from '../services/aiService';
 
 export type RootStackParamList = {
   MainTabs: undefined;
-  AddProduct: { barcode?: string } | undefined;
+  AddProduct:
+    | {
+        barcode?: string;
+        upcData?: Partial<AIFieldMap>;
+        aiData?: AIFieldMap;
+        aiFlatData?: Partial<Record<AIFieldKey, string>>;
+        photoUri?: string;
+      }
+    | undefined;
   ProductDetail: { productId: string };
   Categories: undefined;
 };

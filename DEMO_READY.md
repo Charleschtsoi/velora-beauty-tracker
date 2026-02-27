@@ -1,7 +1,7 @@
-# Hermes App - Demo Ready ✅
+# Velora App - Demo Ready ✅
 
 ## Overview
-The Hermes beauty product expiration tracker app is fully prepared for a 2-minute demo presentation.
+The Velora beauty product expiration tracker app is fully prepared for a 2-minute demo presentation.
 
 ## ✅ Completed Features
 

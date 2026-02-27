@@ -1,21 +1,39 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Image, ImageSourcePropType } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { colors, spacing, radius, shadow, typography } from '../../theme';
 
 interface SummaryCardProps {
   title: string;
   count: number;
   icon: keyof typeof Ionicons.glyphMap;
   color: string;
+  /** Optional background tint for the icon panel (e.g. statusExpiringSoonBg). Makes the icon area more representative. */
+  iconBackgroundColor?: string;
+  /** Optional representative image. When set and loaded, shown instead of icon; icon is fallback. */
+  image?: ImageSourcePropType;
   onPress?: () => void;
   testID?: string;
 }
 
-export default function SummaryCard({ title, count, icon, color, onPress, testID }: SummaryCardProps) {
+export default function SummaryCard({ title, count, icon, color, iconBackgroundColor, image, onPress, testID }: SummaryCardProps) {
+  const [imageError, setImageError] = React.useState(false);
+  const showImage = Boolean(image && !imageError);
+  const bgColor = iconBackgroundColor ?? colors.primaryTint;
+
   const CardContent = (
     <View style={[styles.card, { borderLeftColor: color }]}>
-      <View style={styles.iconContainer}>
-        <Ionicons name={icon} size={24} color={color} />
+      <View style={[styles.iconContainer, styles.imageContainer, { backgroundColor: bgColor }]}>
+        {showImage ? (
+          <Image
+            source={image}
+            style={styles.cardImage}
+            resizeMode="cover"
+            onError={() => setImageError(true)}
+          />
+        ) : (
+          <Ionicons name={icon} size={32} color={color} />
+        )}
       </View>
       <View style={styles.content}>
         <Text style={styles.count}>{count}</Text>
@@ -38,25 +56,27 @@ export default function SummaryCard({ title, count, icon, color, onPress, testID
 const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 16,
-    marginVertical: 6,
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    marginVertical: spacing.xs,
     borderLeftWidth: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    ...shadow.cardRaised,
   },
   iconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#f0fdf4',
+    width: 64,
+    height: 64,
+    borderRadius: radius.md,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: spacing.sm,
+  },
+  imageContainer: {
+    overflow: 'hidden',
+  },
+  cardImage: {
+    width: '100%',
+    height: '100%',
   },
   content: {
     flex: 1,
@@ -65,12 +85,11 @@ const styles = StyleSheet.create({
   count: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#1f2937',
-    marginBottom: 4,
+    color: colors.textPrimary,
+    marginBottom: spacing.xxs,
   },
   title: {
-    fontSize: 14,
-    color: '#6b7280',
-    fontWeight: '500',
+    ...typography.bodyStrong,
+    color: colors.textSecondary,
   },
 });

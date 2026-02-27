@@ -1,32 +1,44 @@
 import React from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Product } from '../../types/product.types';
+import { Product, ProductCategory } from '../../types/product.types';
 import { getExpirationStatus, formatDate, getDaysUntilExpiration } from '../../utils/dateHelpers';
 import { ExpirationStatus } from '../../types/product.types';
+import { colors, spacing, radius, shadow, typography } from '../../theme';
+
+const CATEGORY_LABELS: Record<ProductCategory, string> = {
+  [ProductCategory.SKINCARE]: 'Skincare',
+  [ProductCategory.MAKEUP]: 'Makeup',
+  [ProductCategory.HAIRCARE]: 'Haircare',
+  [ProductCategory.FRAGRANCE]: 'Fragrance',
+  [ProductCategory.BODYCARE]: 'Bodycare',
+  [ProductCategory.NAILCARE]: 'Nailcare',
+  [ProductCategory.OTHER]: 'Other',
+};
 
 interface ProductListItemProps {
   product: Product;
   onPress: () => void;
   onDelete?: () => void;
+  compact?: boolean;
   testID?: string;
 }
 
 const getStatusConfig = (status: ExpirationStatus, daysUntil: number) => {
   switch (status) {
     case ExpirationStatus.EXPIRED:
-      return { text: 'EXPIRED', color: '#ef4444', bgColor: '#fee2e2' };
+      return { text: 'Expired', color: colors.statusExpired, bgColor: colors.statusExpiredBg };
     case ExpirationStatus.EXPIRING_SOON:
       if (daysUntil === 0) {
-        return { text: 'EXPIRES TODAY', color: '#f97316', bgColor: '#fed7aa' };
+        return { text: 'Expires today', color: colors.statusExpiringSoon, bgColor: colors.statusExpiringSoonBg };
       }
-      return { text: 'EXPIRING SOON', color: '#f97316', bgColor: '#fed7aa' };
+      return { text: 'Expiring', color: colors.statusExpiringSoon, bgColor: colors.statusExpiringSoonBg };
     case ExpirationStatus.WARNING:
-      return { text: 'WARNING', color: '#fbbf24', bgColor: '#fef3c7' };
+      return { text: 'Warning', color: colors.statusWarning, bgColor: colors.statusWarningBg };
     case ExpirationStatus.SAFE:
-      return { text: 'SAFE', color: '#10b981', bgColor: '#d1fae5' };
+      return { text: 'Safe', color: colors.statusSafe, bgColor: colors.statusSafeBg };
     default:
-      return { text: 'UNKNOWN', color: '#6b7280', bgColor: '#f3f4f6' };
+      return { text: '—', color: colors.statusMuted, bgColor: colors.statusMutedBg };
   }
 };
 
@@ -34,65 +46,75 @@ export default function ProductListItem({
   product,
   onPress,
   onDelete,
+  compact = false,
   testID,
 }: ProductListItemProps) {
   const status = getExpirationStatus(product.expirationDate);
   const daysUntil = getDaysUntilExpiration(product.expirationDate);
   const statusConfig = getStatusConfig(status, daysUntil);
+  const categoryLabel = CATEGORY_LABELS[product.category];
+
+  const containerStyle = compact ? [styles.container, styles.containerCompact] : styles.container;
+  const imageSize = compact ? 44 : 60;
+  const imageStyle = [styles.image, compact && { width: imageSize, height: imageSize }];
+  const placeholderStyle = [styles.imagePlaceholder, compact && { width: imageSize, height: imageSize }];
 
   return (
     <TouchableOpacity
-      style={styles.container}
+      style={containerStyle}
       onPress={onPress}
       activeOpacity={0.7}
       testID={testID}
     >
-      {/* Product Image */}
-      <View style={styles.imageContainer}>
-        {product.photoUrl ? (
-          <Image source={{ uri: product.photoUrl }} style={styles.image} />
-        ) : (
-          <View style={styles.imagePlaceholder}>
-            <Ionicons
-              name="cube-outline"
-              size={24}
-              color="#10b981"
-            />
-          </View>
-        )}
+      {/* Image column */}
+      <View style={[styles.imageColumn, compact && styles.imageColumnCompact]}>
+        <View style={styles.imageContainer}>
+          {product.photoUrl ? (
+            <Image source={{ uri: product.photoUrl }} style={imageStyle} />
+          ) : (
+            <View style={placeholderStyle}>
+              <Ionicons name="cube-outline" size={compact ? 20 : 24} color={colors.primary} />
+            </View>
+          )}
+        </View>
       </View>
 
       {/* Product Info */}
-      <View style={styles.infoContainer}>
-        <Text style={styles.productName} numberOfLines={1}>
-          {product.name}
-        </Text>
-        {product.brand && (
+      <View style={styles.infoContainer} pointerEvents="box-none">
+        <View style={styles.statusRow}>
+          <View style={[styles.statusBadge, { backgroundColor: statusConfig.bgColor }]}>
+            <Text style={[styles.statusText, { color: statusConfig.color }]}>
+              {statusConfig.text}
+            </Text>
+          </View>
+        </View>
+        <View style={styles.titleRow} pointerEvents="box-none">
+          <Text style={compact ? styles.productNameCompact : styles.productName} numberOfLines={2}>
+            {product.name}
+          </Text>
+        </View>
+        <View style={styles.categoryRow}>
+          <View style={styles.categoryPill}>
+            <Text style={styles.categoryPillText}>{categoryLabel}</Text>
+          </View>
+        </View>
+        {!compact && product.brand && (
           <Text style={styles.brand} numberOfLines={1}>
             {product.brand}
           </Text>
         )}
         <View style={styles.dateContainer}>
-          <Ionicons name="calendar-outline" size={14} color="#6b7280" />
-          <Text style={styles.expiryDate}>
-            Expires: {formatDate(product.expirationDate)}
+          <Ionicons name="calendar-outline" size={compact ? 12 : 14} color={colors.textSecondary} />
+          <Text style={compact ? styles.expiryDateCompact : styles.expiryDate}>
+            {compact
+              ? daysUntil >= 0
+                ? `${daysUntil} ${daysUntil === 1 ? 'day' : 'days'} left`
+                : `Expired ${Math.abs(daysUntil)} ${Math.abs(daysUntil) === 1 ? 'day' : 'days'} ago`
+              : `Expires: ${formatDate(product.expirationDate)}`}
           </Text>
         </View>
       </View>
 
-      {/* Status Badge */}
-      <View
-        style={[
-          styles.statusBadge,
-          { backgroundColor: statusConfig.bgColor },
-        ]}
-      >
-        <Text style={[styles.statusText, { color: statusConfig.color }]}>
-          {statusConfig.text}
-        </Text>
-      </View>
-
-      {/* Delete Button (shown on swipe or long press) */}
       {onDelete && (
         <TouchableOpacity
           style={styles.deleteButton}
@@ -102,7 +124,7 @@ export default function ProductListItem({
           }}
           testID="delete-button"
         >
-          <Ionicons name="trash-outline" size={20} color="#ffffff" />
+          <Ionicons name="trash-outline" size={20} color={colors.white} />
         </TouchableOpacity>
       )}
     </TouchableOpacity>
@@ -112,77 +134,120 @@ export default function ProductListItem({
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 12,
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 2,
+    ...shadow.card,
   },
-  imageContainer: {
-    marginRight: 12,
+  containerCompact: {
+    padding: spacing.sm,
+    marginBottom: spacing.xs,
   },
+  imageColumn: {
+    flexDirection: 'column',
+    alignItems: 'center',
+    width: 60,
+    marginRight: spacing.sm,
+  },
+  imageColumnCompact: {
+    width: 44,
+  },
+  imageContainer: {},
   image: {
     width: 60,
     height: 60,
-    borderRadius: 8,
-    backgroundColor: '#f3f4f6',
+    borderRadius: radius.sm,
+    backgroundColor: colors.surfaceMuted,
   },
   imagePlaceholder: {
     width: 60,
     height: 60,
-    borderRadius: 8,
-    backgroundColor: '#f0fdf4',
+    borderRadius: radius.sm,
+    backgroundColor: colors.primaryTint,
     justifyContent: 'center',
     alignItems: 'center',
   },
   infoContainer: {
     flex: 1,
     justifyContent: 'center',
+    minWidth: 0,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    minWidth: 0,
+    marginBottom: 2,
   },
   productName: {
-    fontSize: 16,
+    flex: 1,
+    minWidth: 0,
+    ...typography.bodyLargeStrong,
+    color: colors.textPrimary,
+  },
+  productNameCompact: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 14,
     fontWeight: '600',
-    color: '#1f2937',
+    color: colors.textPrimary,
+  },
+  categoryRow: {
+    flexDirection: 'row',
     marginBottom: 4,
   },
+  categoryPill: {
+    flexShrink: 0,
+    backgroundColor: colors.surfaceMuted,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: 2,
+    borderRadius: radius.sm,
+  },
+  categoryPillText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.textSecondary,
+  },
   brand: {
-    fontSize: 14,
-    color: '#6b7280',
+    ...typography.body,
+    color: colors.textSecondary,
     marginBottom: 6,
   },
   dateContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: spacing.xxs,
   },
   expiryDate: {
-    fontSize: 12,
-    color: '#6b7280',
+    ...typography.caption,
+    color: colors.textSecondary,
+  },
+  expiryDateCompact: {
+    fontSize: 11,
+    color: colors.textSecondary,
+  },
+  statusRow: {
+    flexDirection: 'row',
+    alignSelf: 'flex-start',
+    marginBottom: 4,
   },
   statusBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 12,
-    marginLeft: 8,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xxs,
+    borderRadius: radius.sm,
   },
   statusText: {
     fontSize: 11,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    fontWeight: '600',
+    color: colors.textPrimary,
   },
   deleteButton: {
-    backgroundColor: '#ef4444',
+    backgroundColor: colors.destructive,
     width: 50,
     height: 50,
-    borderRadius: 8,
+    borderRadius: radius.sm,
     justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: 8,
+    marginLeft: spacing.sm,
   },
 });

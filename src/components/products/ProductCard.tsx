@@ -3,6 +3,7 @@ import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
 import { Product } from '../../types/product.types';
 import { getExpirationStatus, formatDate } from '../../utils/dateHelpers';
 import { ExpirationStatus } from '../../types/product.types';
+import { colors, spacing, radius, shadow, typography } from '../../theme';
 
 interface ProductCardProps {
   product: Product;
@@ -13,15 +14,15 @@ interface ProductCardProps {
 const getStatusColor = (status: ExpirationStatus): string => {
   switch (status) {
     case ExpirationStatus.EXPIRED:
-      return '#ef4444';
+      return colors.statusExpired;
     case ExpirationStatus.EXPIRING_SOON:
-      return '#f97316';
+      return colors.statusExpiringSoon;
     case ExpirationStatus.WARNING:
-      return '#fbbf24';
+      return colors.statusWarning;
     case ExpirationStatus.SAFE:
-      return '#10b981';
+      return colors.statusSafe;
     default:
-      return '#6b7280';
+      return colors.statusMuted;
   }
 };
 
@@ -39,7 +40,7 @@ export default function ProductCard({ product, onPress, testID }: ProductCardPro
       {product.photoUrl ? (
         <Image source={{ uri: product.photoUrl }} style={styles.image} />
       ) : (
-        <View style={[styles.imagePlaceholder, { backgroundColor: '#f0fdf4' }]}>
+        <View style={styles.imagePlaceholder}>
           <Text style={styles.placeholderText}>
             {product.name.charAt(0).toUpperCase()}
           </Text>
@@ -69,49 +70,45 @@ export default function ProductCard({ product, onPress, testID }: ProductCardPro
 const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 12,
-    marginVertical: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 2,
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    padding: spacing.sm,
+    marginVertical: spacing.xs,
+    ...shadow.card,
   },
   image: {
     width: 60,
     height: 60,
-    borderRadius: 8,
-    marginRight: 12,
+    borderRadius: radius.sm,
+    marginRight: spacing.sm,
   },
   imagePlaceholder: {
     width: 60,
     height: 60,
-    borderRadius: 8,
-    marginRight: 12,
+    borderRadius: radius.sm,
+    marginRight: spacing.sm,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: colors.primaryTint,
   },
   placeholderText: {
     fontSize: 24,
     fontWeight: '600',
-    color: '#10b981',
+    color: colors.primary,
   },
   content: {
     flex: 1,
     justifyContent: 'center',
   },
   name: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1f2937',
-    marginBottom: 4,
+    ...typography.bodyLargeStrong,
+    color: colors.textPrimary,
+    marginBottom: spacing.xxs,
   },
   brand: {
-    fontSize: 14,
-    color: '#6b7280',
-    marginBottom: 8,
+    ...typography.body,
+    color: colors.textSecondary,
+    marginBottom: spacing.xs,
   },
   dateContainer: {
     flexDirection: 'row',
@@ -121,10 +118,10 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    marginRight: 6,
+    marginRight: spacing.xs,
   },
   date: {
-    fontSize: 12,
-    color: '#6b7280',
+    ...typography.caption,
+    color: colors.textSecondary,
   },
 });

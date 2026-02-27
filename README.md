@@ -1,4 +1,4 @@
-# Hermes - Beauty Product Expiration Tracker
+# Velora - Beauty Product Expiration Tracker
 
 A React Native Expo app for tracking beauty product expiration dates with barcode scanning, notifications, and category organization.
 
@@ -35,9 +35,10 @@ A React Native Expo app for tracking beauty product expiration dates with barcod
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/charleschtsoi/hermes-beauty-tracker.git
-cd hermes-beauty-tracker
+git clone https://github.com/charleschtsoi/velora-beauty-tracker.git
+cd velora-beauty-tracker
 ```
+   (If the repo has not been renamed yet, use `hennessy-beauty-tracker` or `hermes-beauty-tracker` in the URL and directory name.)
 
 2. Install dependencies:
 ```bash
