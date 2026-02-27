@@ -16,9 +16,11 @@ interface SummaryCardProps {
   testID?: string;
   /** Optional delay in ms for staggered entrance (e.g. index * 50). */
   entranceDelay?: number;
+  /** When 'hero', uses vertical layout (icon on top, count, title) and glassmorphism styling for homepage. */
+  variant?: 'default' | 'hero';
 }
 
-export default function SummaryCard({ title, count, icon, color, iconBackgroundColor, image, onPress, testID, entranceDelay = 0 }: SummaryCardProps) {
+export default function SummaryCard({ title, count, icon, color, iconBackgroundColor, image, onPress, testID, entranceDelay = 0, variant = 'default' }: SummaryCardProps) {
   const [imageError, setImageError] = React.useState(false);
   const opacity = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(8)).current;
@@ -33,8 +35,26 @@ export default function SummaryCard({ title, count, icon, color, iconBackgroundC
   }, [entranceDelay, opacity, translateY]);
   const showImage = Boolean(image && !imageError);
   const bgColor = iconBackgroundColor ?? colors.primaryTint;
+  const isHero = variant === 'hero';
 
-  const CardContent = (
+  const CardContent = isHero ? (
+    <View style={[styles.cardHero, { shadowColor: color }]}>
+      <View style={[styles.iconCircleHero, { backgroundColor: bgColor, shadowColor: color }]}>
+        {showImage ? (
+          <Image
+            source={image!}
+            style={styles.cardImage}
+            resizeMode="cover"
+            onError={() => setImageError(true)}
+          />
+        ) : (
+          <Ionicons name={icon} size={28} color={color} />
+        )}
+      </View>
+      <Text style={[styles.countHero, { color }]}>{count}</Text>
+      <Text style={styles.titleHero}>{title}</Text>
+    </View>
+  ) : (
     <View style={[styles.card, { borderLeftColor: color }]}>
       <View style={[styles.iconContainer, styles.imageContainer, { backgroundColor: bgColor }]}>
         {showImage ? (
@@ -75,16 +95,52 @@ const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
     backgroundColor: colors.surface,
-    borderRadius: radius.lg,
+    borderRadius: 14,
     padding: spacing.md,
     marginVertical: spacing.xs,
-    borderLeftWidth: 3,
+    borderLeftWidth: 4,
     ...shadow.cardRaised,
+  },
+  cardHero: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.75)',
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    marginHorizontal: spacing.xxs,
+    minWidth: 0,
+    flex: 1,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  iconCircleHero: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  countHero: {
+    fontSize: 26,
+    fontWeight: '700',
+    marginBottom: spacing.xxs,
+  },
+  titleHero: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.textSecondary,
+    textAlign: 'center',
   },
   iconContainer: {
     width: 64,
     height: 64,
-    borderRadius: radius.md,
+    borderRadius: 11,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: spacing.sm,

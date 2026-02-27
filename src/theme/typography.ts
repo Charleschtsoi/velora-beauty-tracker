@@ -2,7 +2,10 @@
  * Design tokens: type scale and text styles.
  * Roles: caption, body, bodyStrong, subtitle, title, headline, display (logo).
  */
-import { TextStyle } from 'react-native';
+import { TextStyle, Platform } from 'react-native';
+
+/** Serif font for brand (Vacelyn-style); use for logo and tagline. Replace with custom font (e.g. Vacelyn) when loaded. */
+export const brandFontFamily = Platform.select({ ios: 'Georgia', android: 'serif', default: 'serif' });
 
 const scale = {
   caption: 12,

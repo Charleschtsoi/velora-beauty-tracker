@@ -38,6 +38,12 @@ export const colors = {
   statusMuted: '#6b7280',
   statusMutedBg: '#f3f4f6',
 
+  // Hero / homepage (green-aligned with rest of app)
+  heroGradientStart: '#ecfdf5',
+  heroGradientEnd: '#ffffff',
+  logoBrownishPink: '#9d7b7b',
+  accentGold: '#b45309',
+
   // Interactive
   link: '#10b981',
   destructive: '#ef4444',

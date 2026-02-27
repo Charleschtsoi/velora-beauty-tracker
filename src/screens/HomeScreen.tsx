@@ -2,6 +2,7 @@ import React, { useMemo, useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
+  Image,
   ScrollView,
   StyleSheet,
   TouchableOpacity,
@@ -9,6 +10,7 @@ import {
   Modal,
   Animated,
   Pressable,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,8 +22,13 @@ import ProductCard from '../components/products/ProductCard';
 import { useNavigation } from '@react-navigation/native';
 import { SkeletonCard } from '../components/common/SkeletonLoader';
 import EmptyState from '../components/common/EmptyState';
-import { colors, spacing, radius, shadow, typography } from '../theme';
+import { colors, spacing, radius, shadow, typography, brandFontFamily } from '../theme';
 import * as settingsStorage from '../services/settingsStorage';
+
+const { width: WINDOW_WIDTH, height: WINDOW_HEIGHT } = Dimensions.get('window');
+const HERO_HEIGHT = Math.round(Math.max(64, WINDOW_HEIGHT * 0.1));
+/** Zoom-out factor for hero banner: image is scaled to cover a larger area so more of the image is visible. */
+const HERO_ZOOM_OUT = 1.3;
 
 // Navigation types
 type RootStackParamList = {
@@ -200,29 +207,23 @@ export default function HomeScreen() {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          {/* Header Skeleton */}
-          <View style={styles.header}>
-            <View style={styles.headerLeft}>
-              <TouchableOpacity onPress={() => navigation.getParent()?.navigate('Home' as never)} activeOpacity={0.7}>
-                <Text style={styles.logo}>Velora</Text>
-              </TouchableOpacity>
-            </View>
-            <View style={styles.headerRight}>
-              <View style={[styles.iconButton, { opacity: 0.3 }]} />
-              <View style={[styles.avatar, { opacity: 0.3 }]} />
-            </View>
+          {/* Hero Skeleton */}
+          <View style={styles.heroSkeleton}>
+            <Text style={[styles.logo, { opacity: 0.5 }]}>VELORA</Text>
+            <View style={styles.taglineSkeleton} />
           </View>
 
-          {/* Summary Cards Skeleton */}
+          {/* Summary Cards Skeleton: vertical full-width rows */}
           <View style={styles.summarySection}>
-            <View style={[styles.skeletonCard, { opacity: 0.3 }]} />
-            <View style={[styles.skeletonCard, { opacity: 0.3 }]} />
-            <View style={[styles.skeletonCard, { opacity: 0.3 }]} />
+            <Text style={styles.sectionTitleTop}>Product Status</Text>
+            <View style={[styles.skeletonCardVertical, { opacity: 0.3 }]} />
+            <View style={[styles.skeletonCardVertical, { opacity: 0.3 }]} />
+            <View style={[styles.skeletonCardVertical, { opacity: 0.3 }]} />
           </View>
 
           {/* Product Cards Skeleton */}
           <View style={styles.recentSection}>
-            <Text style={styles.sectionTitle}>Recently Added</Text>
+            <Text style={styles.sectionTitleSecondary}>Recently Added</Text>
             <SkeletonCard />
             <SkeletonCard />
             <SkeletonCard />
@@ -239,33 +240,58 @@ export default function HomeScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
-        <View style={styles.header}>
-          <View style={styles.headerLeft}>
-            <TouchableOpacity onPress={() => navigation.getParent()?.navigate('Home' as never)} activeOpacity={0.7}>
-              <Text style={styles.logo}>Velora</Text>
-            </TouchableOpacity>
+        {/* Hero: image as background (zoomed out so more of banner is visible), VELORA + tagline on top */}
+        <View style={styles.heroGradient}>
+          <View
+            style={[
+              styles.heroImageWrapper,
+              {
+                width: WINDOW_WIDTH * HERO_ZOOM_OUT,
+                height: HERO_HEIGHT * HERO_ZOOM_OUT,
+                left: -((WINDOW_WIDTH * (HERO_ZOOM_OUT - 1)) / 2),
+                top: -((HERO_HEIGHT * (HERO_ZOOM_OUT - 1)) / 2),
+              },
+            ]}
+          >
+            <Image
+              source={require('../assets/hero-banner.png')}
+              style={styles.heroImageBackground}
+              resizeMode="cover"
+              onError={(e) => console.warn('Hero image failed to load:', e.nativeEvent.error)}
+            />
           </View>
-          <View style={styles.headerRight}>
-            <TouchableOpacity
-              style={styles.iconButton}
-              onPress={() => navigation.navigate('Inventory')}
-              testID="search-button"
-            >
-              <Ionicons name="search-outline" size={24} color={colors.textPrimary} />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.iconButton} testID="profile-button">
-              <View style={styles.avatar}>
-                <Ionicons name="person" size={20} color={colors.primary} />
+          <View style={styles.heroOverlay} />
+          <View style={styles.heroTopBarWrapper}>
+            <View style={styles.heroTopBar}>
+              <View style={styles.headerLeft}>
+                <TouchableOpacity onPress={() => navigation.getParent()?.navigate('Home' as never)} activeOpacity={0.8} style={styles.logoTouchable}>
+                  <Text style={styles.logo}>VELORA</Text>
+                </TouchableOpacity>
+                <Text style={styles.tagline}>Track. Protect. Glow.</Text>
               </View>
-            </TouchableOpacity>
+              <View style={styles.headerRight}>
+                <TouchableOpacity
+                  style={styles.iconButton}
+                  onPress={() => navigation.navigate('Inventory')}
+                  testID="search-button"
+                >
+                  <Ionicons name="search-outline" size={24} color={colors.textPrimary} />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.iconButton} testID="profile-button">
+                  <View style={styles.avatar}>
+                    <Ionicons name="person" size={20} color={colors.primary} />
+                  </View>
+                </TouchableOpacity>
+              </View>
+            </View>
           </View>
         </View>
 
-        {/* Summary Cards */}
+        {/* Summary Cards: vertical stack, full width (icon left, count+label right) */}
         <View style={styles.summarySection}>
+          <Text style={styles.sectionTitleTop}>Product Status</Text>
           <SummaryCard
-            title="Expiring Soon"
+            title="Expiring"
             count={stats.expiringSoon}
             icon="time"
             color={colors.statusExpiringSoon}
@@ -308,7 +334,7 @@ export default function HomeScreen() {
         {/* Expiring Soon Section */}
         {expiringSoonProducts.length > 0 && (
           <View style={styles.recentSection}>
-            <Text style={styles.sectionTitle}>Expiring soon</Text>
+            <Text style={styles.sectionTitleSecondary}>Expiring soon</Text>
             {expiringSoonProducts.map((product, index) => (
               <ProductCard
                 key={product.id}
@@ -324,7 +350,7 @@ export default function HomeScreen() {
         {/* Recently Added Section */}
         {recentProducts.length > 0 ? (
           <View style={styles.recentSection}>
-            <Text style={styles.sectionTitle}>Recently Added</Text>
+            <Text style={styles.sectionTitleSecondary}>Recently Added</Text>
             {recentProducts.map((product, index) => (
               <ProductCard
                 key={product.id}
@@ -386,20 +412,37 @@ const styles = StyleSheet.create({
     ...typography.bodyLarge,
     color: colors.textSecondary,
   },
-  header: {
+  heroGradient: {
+    paddingHorizontal: spacing.lg,
+    height: HERO_HEIGHT,
+    overflow: 'hidden',
+  },
+  heroImageWrapper: {
+    position: 'absolute',
+  },
+  heroImageBackground: {
+    width: '100%',
+    height: '100%',
+  },
+  heroOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(236, 253, 245, 0.55)',
+  },
+  heroTopBarWrapper: {
+    flex: 1,
+    justifyContent: 'center',
+    zIndex: 1,
+  },
+  heroTopBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    backgroundColor: colors.surface,
+    zIndex: 1,
   },
   headerLeft: {
     flex: 1,
-  },
-  logo: {
-    ...typography.display,
-    color: colors.primary,
+    justifyContent: 'center',
+    alignItems: 'flex-start',
   },
   headerRight: {
     flexDirection: 'row',
@@ -410,27 +453,69 @@ const styles = StyleSheet.create({
     padding: spacing.xxs,
   },
   avatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     backgroundColor: colors.primaryTint,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 2,
+    borderWidth: 1.5,
     borderColor: colors.primaryLight,
   },
-  summarySection: {
+  logoTouchable: {
+    alignSelf: 'flex-start',
+  },
+  logo: {
+    fontFamily: brandFontFamily,
+    fontSize: 20,
+    fontWeight: '700',
+    letterSpacing: 1,
+    color: colors.primary,
+  },
+  tagline: {
+    fontFamily: brandFontFamily,
+    marginTop: 2,
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.textPrimary,
+  },
+  heroSkeleton: {
+    paddingTop: spacing.xs,
+    paddingBottom: spacing.xs,
     paddingHorizontal: spacing.lg,
+    alignItems: 'flex-start',
+    minHeight: 72,
+  },
+  taglineSkeleton: {
+    marginTop: spacing.xs,
+    width: 160,
+    height: 14,
+    backgroundColor: colors.border,
+    opacity: 0.5,
+  },
+  summarySection: {
+    paddingHorizontal: spacing.md,
     paddingTop: spacing.lg,
+  },
+  sectionTitleTop: {
+    ...typography.title,
+    color: colors.textPrimary,
+    marginBottom: spacing.sm,
   },
   recentSection: {
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
+    paddingTop: spacing.xxl,
   },
   sectionTitle: {
     ...typography.title,
     color: colors.textPrimary,
-    marginBottom: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  sectionTitleSecondary: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: colors.textPrimary,
+    marginBottom: spacing.md,
   },
   skeletonCard: {
     flex: 1,
@@ -438,6 +523,12 @@ const styles = StyleSheet.create({
     backgroundColor: colors.border,
     borderRadius: radius.md,
     marginHorizontal: spacing.xs,
+  },
+  skeletonCardVertical: {
+    height: 72,
+    backgroundColor: colors.border,
+    borderRadius: radius.lg,
+    marginVertical: spacing.xs,
   },
   scanButton: {
     flexDirection: 'row',
@@ -471,15 +562,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.xs,
+    gap: spacing.sm,
     paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    marginHorizontal: spacing.lg,
+    paddingHorizontal: spacing.lg,
+    marginHorizontal: spacing.md,
+    marginTop: spacing.lg,
+    marginBottom: spacing.md,
+    backgroundColor: colors.primaryTint,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.primaryLight,
+    ...shadow.cardSubtle,
   },
   browseCategoriesLinkText: {
     fontSize: 15,
-    fontWeight: '500',
-    color: colors.link,
+    fontWeight: '600',
+    color: colors.primary,
   },
   firstRunOverlay: {
     flex: 1,

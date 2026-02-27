@@ -1,5 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet, Animated } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Product } from '../../types/product.types';
 import { getExpirationStatus, formatDate } from '../../utils/dateHelpers';
 import { ExpirationStatus } from '../../types/product.types';
@@ -18,7 +19,7 @@ const getStatusColor = (status: ExpirationStatus): string => {
     case ExpirationStatus.EXPIRED:
       return colors.statusExpired;
     case ExpirationStatus.EXPIRING_SOON:
-      return colors.statusExpiringSoon;
+      return colors.accentGold;
     case ExpirationStatus.WARNING:
       return colors.statusWarning;
     case ExpirationStatus.SAFE:
@@ -60,7 +61,7 @@ export default function ProductCard({ product, onPress, testID, entranceDelay = 
           </Text>
         </View>
       )}
-      
+
       <View style={styles.content}>
         <Text style={styles.name} numberOfLines={1}>
           {product.name}
@@ -71,40 +72,46 @@ export default function ProductCard({ product, onPress, testID, entranceDelay = 
           </Text>
         )}
         <View style={styles.dateContainer}>
+          <Text style={styles.date}>{formatDate(product.expirationDate)}</Text>
           <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
-          <Text style={styles.date}>
-            Expires: {formatDate(product.expirationDate)}
-          </Text>
         </View>
       </View>
+      <Ionicons name="chevron-forward" size={18} color={colors.iconMuted} style={styles.chevron} />
     </TouchableOpacity>
     </Animated.View>
   );
 }
 
+const THUMB_SIZE = 60;
+const THUMB_RADIUS = 10;
+
 const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
-    padding: spacing.sm,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
     marginVertical: spacing.xs,
     ...shadow.cardSubtle,
   },
   image: {
-    width: 72,
-    height: 72,
-    borderRadius: radius.md,
+    width: THUMB_SIZE,
+    height: THUMB_SIZE,
+    borderRadius: THUMB_RADIUS,
     marginRight: spacing.sm,
+    ...shadow.cardSubtle,
   },
   imagePlaceholder: {
-    width: 72,
-    height: 72,
-    borderRadius: radius.md,
+    width: THUMB_SIZE,
+    height: THUMB_SIZE,
+    borderRadius: THUMB_RADIUS,
     marginRight: spacing.sm,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: colors.primaryTint,
+    ...shadow.cardSubtle,
   },
   placeholderText: {
     fontSize: 24,
@@ -128,15 +135,19 @@ const styles = StyleSheet.create({
   dateContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
   },
   statusDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    marginRight: spacing.xs,
+    marginLeft: spacing.xs,
   },
   date: {
     ...typography.caption,
     color: colors.textSecondary,
+  },
+  chevron: {
+    marginLeft: spacing.xs,
   },
 });

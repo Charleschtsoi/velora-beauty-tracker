@@ -7,7 +7,8 @@
     "start:tunnel": "node scripts/expo-connection-diagnostic.js tunnel && expo start --tunnel",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "start:clear": "node scripts/expo-connection-diagnostic.js && expo start --clear"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
@@ -22,6 +23,7 @@
     "expo-constants": "~17.0.0",
     "expo-file-system": "~19.0.21",
     "expo-image-picker": "~17.0.10",
+    "expo-linear-gradient": "~15.0.8",
     "expo-notifications": "~0.32.16",
     "expo-status-bar": "~3.0.9",
     "nativewind": "^4.2.1",
