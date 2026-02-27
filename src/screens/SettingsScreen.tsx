@@ -87,6 +87,7 @@ export default function SettingsScreen() {
   const [expiringSoonAlert, setExpiringSoonAlert] = useState(true);
   const [expiredAlert, setExpiredAlert] = useState(true);
   const [reminderTime, setReminderTime] = useState('9:00 AM');
+  const [reminderDaysBefore, setReminderDaysBefore] = useState(1);
   const [timePickerVisible, setTimePickerVisible] = useState(false);
   const [tempTime, setTempTime] = useState(() => {
     const d = new Date();
@@ -98,14 +99,16 @@ export default function SettingsScreen() {
 
   useEffect(() => {
     (async () => {
-      const [notif, soon, expired] = await Promise.all([
+      const [notif, soon, expired, daysBefore] = await Promise.all([
         settingsStorage.getNotificationsEnabled(),
         settingsStorage.getExpiringSoonAlert(),
         settingsStorage.getExpiredAlert(),
+        settingsStorage.getReminderDaysBefore(),
       ]);
       setNotificationsEnabled(notif);
       setExpiringSoonAlert(soon);
       setExpiredAlert(expired);
+      setReminderDaysBefore(daysBefore);
       const { hour, minute } = await settingsStorage.getReminderTime();
       setReminderTime(settingsStorage.formatReminderTime(hour, minute));
       const d = new Date();
@@ -149,6 +152,25 @@ export default function SettingsScreen() {
       return d;
     });
     setTimePickerVisible(true);
+  };
+
+  const handleDaysBeforePress = () => {
+    Alert.alert(
+      'Remind me before expiry',
+      'Choose how many days before the expiry date you want to be reminded.',
+      [
+        { text: '1 day', onPress: () => applyDaysBefore(1) },
+        { text: '3 days', onPress: () => applyDaysBefore(3) },
+        { text: '7 days', onPress: () => applyDaysBefore(7) },
+        { text: '14 days', onPress: () => applyDaysBefore(14) },
+        { text: 'Cancel', style: 'cancel' },
+      ]
+    );
+  };
+
+  const applyDaysBefore = async (days: number) => {
+    await settingsStorage.setReminderDaysBefore(days);
+    setReminderDaysBefore(days);
   };
 
   const handleTimePickerChange = (_event: any, selectedDate?: Date) => {
@@ -249,7 +271,7 @@ export default function SettingsScreen() {
                 icon="warning"
                 iconColor="#f97316"
                 title="Expiring soon reminders"
-                subtitle="Remind me when products expire in 1–3 days"
+                subtitle={reminderDaysBefore === 1 ? 'Remind me 1 day before expiry' : `Remind me ${reminderDaysBefore} days before expiry`}
                 rightComponent={
                   <Switch
                     value={expiringSoonAlert}
@@ -282,6 +304,14 @@ export default function SettingsScreen() {
                   />
                 }
                 showArrow={false}
+              />
+              <SettingsItem
+                icon="calendar"
+                iconColor="#6b7280"
+                title="Days before expiry"
+                subtitle={reminderDaysBefore === 1 ? '1 day before' : `${reminderDaysBefore} days before`}
+                onPress={handleDaysBeforePress}
+                testID="reminder-days-item"
               />
               <SettingsItem
                 icon="time"

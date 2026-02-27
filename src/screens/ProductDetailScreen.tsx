@@ -21,7 +21,7 @@ import PhotoUploader from '../components/common/PhotoUploader';
 import DatePickerField from '../components/common/DatePickerField';
 import DropdownSelect from '../components/common/DropdownSelect';
 import { showToast } from '../utils/toast';
-import { onProductUpdated, cancelExpiryReminder } from '../services/localNotificationService';
+import { onProductUpdated, cancelExpiryReminder, cancelPAOReminder } from '../services/localNotificationService';
 import { colors } from '../theme';
 
 // Navigation types
@@ -167,6 +167,8 @@ export default function ProductDetailScreen() {
         purchaseDate,
         usageCount: quantity,
         notes: notes.trim() || undefined,
+        openedDate: product.openedDate,
+        paoMonths: product.paoMonths,
       };
       await updateProduct(product.id, updates);
 
@@ -205,6 +207,7 @@ export default function ProductDetailScreen() {
           onPress: async () => {
             try {
               await cancelExpiryReminder(product.id);
+              await cancelPAOReminder(product.id);
               await deleteProduct(product.id);
               showToast('Product deleted successfully!', 'success');
               setTimeout(() => navigation.goBack(), 500);

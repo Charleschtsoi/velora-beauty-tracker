@@ -1,9 +1,7 @@
 import * as Notifications from 'expo-notifications';
 import { Product } from '../types/product.types';
 import { SchedulableTriggerInputTypes } from 'expo-notifications';
-import { getReminderTime, getNotificationsEnabled } from './settingsStorage';
-
-const EXPIRY_REMINDER_DAYS_BEFORE = 1;
+import { getReminderTime, getReminderDaysBefore, getNotificationsEnabled } from './settingsStorage';
 
 /**
  * Request notification permission (idempotent). Returns true if granted.
@@ -43,6 +41,7 @@ export async function notifyProductSaved(): Promise<void> {
 }
 
 const EXPIRY_IDENTIFIER_PREFIX = 'expiry-';
+const PAO_IDENTIFIER_PREFIX = 'pao-';
 
 /**
  * Cancel the scheduled expiry reminder for a product (e.g. after edit or delete).
@@ -56,8 +55,19 @@ export async function cancelExpiryReminder(productId: string): Promise<void> {
 }
 
 /**
- * Schedule a reminder 1 day before product expires at user's Reminder time.
- * Skips if "Reminder notifications" is off, permission denied, or expiry is in the past or within 1 day.
+ * Cancel the scheduled PAO (use-by after opening) reminder for a product.
+ */
+export async function cancelPAOReminder(productId: string): Promise<void> {
+  try {
+    await Notifications.cancelScheduledNotificationAsync(PAO_IDENTIFIER_PREFIX + productId);
+  } catch {
+    // Silently ignore
+  }
+}
+
+/**
+ * Schedule a reminder X days before product expires at user's Reminder time.
+ * X is from Settings (Remind me before expiry). Skips if notifications off or reminder date in the past.
  */
 export async function scheduleExpiryReminder(product: Product): Promise<void> {
   const enabled = await getNotificationsEnabled();
@@ -65,10 +75,11 @@ export async function scheduleExpiryReminder(product: Product): Promise<void> {
   const granted = await requestNotificationPermission();
   if (!granted) return;
 
+  const daysBefore = await getReminderDaysBefore();
   const { hour, minute } = await getReminderTime();
   const expiry = new Date(product.expirationDate);
   const reminderDate = new Date(expiry);
-  reminderDate.setDate(reminderDate.getDate() - EXPIRY_REMINDER_DAYS_BEFORE);
+  reminderDate.setDate(reminderDate.getDate() - daysBefore);
   reminderDate.setHours(hour, minute, 0, 0);
 
   const now = new Date();
@@ -86,6 +97,48 @@ export async function scheduleExpiryReminder(product: Product): Promise<void> {
         date: reminderDate,
       },
       identifier: EXPIRY_IDENTIFIER_PREFIX + product.id,
+    });
+  } catch {
+    // Silently ignore
+  }
+}
+
+/**
+ * Schedule a one-time reminder for "use by X months after opening" when product has openedDate and paoMonths.
+ * Fires at user's reminder time on the day before useByAfterOpening. Skips if that date is in the past or notifications off.
+ */
+export async function schedulePAOReminder(product: Product): Promise<void> {
+  const enabled = await getNotificationsEnabled();
+  if (!enabled) return;
+  const granted = await requestNotificationPermission();
+  if (!granted) return;
+
+  const opened = product.openedDate;
+  const paoMonths = product.paoMonths;
+  if (!opened || paoMonths == null || paoMonths < 1) return;
+
+  const useBy = new Date(opened);
+  useBy.setMonth(useBy.getMonth() + paoMonths);
+  const reminderDate = new Date(useBy);
+  reminderDate.setDate(reminderDate.getDate() - 1); // day before use-by
+  const { hour, minute } = await getReminderTime();
+  reminderDate.setHours(hour, minute, 0, 0);
+
+  const now = new Date();
+  if (reminderDate.getTime() <= now.getTime()) return;
+
+  try {
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: 'Use-by after opening',
+        body: `"${product.name}" should be used by ${reminderDate.toLocaleDateString()} (${paoMonths} months after opening).`,
+        data: { productId: product.id },
+      },
+      trigger: {
+        type: SchedulableTriggerInputTypes.DATE,
+        date: reminderDate,
+      },
+      identifier: PAO_IDENTIFIER_PREFIX + product.id,
     });
   } catch {
     // Silently ignore
@@ -110,15 +163,17 @@ export async function onProductSaved(product: Product): Promise<void> {
       await notifyProductSaved();
     }
     await scheduleExpiryReminder(product);
+    await schedulePAOReminder(product);
   }
 }
 
 /**
- * Call after a product is updated (e.g. from edit): cancel the old expiry reminder
- * and schedule a new one for the updated expiration date. Status and reminders
- * will reflect the new date (e.g. if now safe, reminder moves to 1 day before new expiry).
+ * Call after a product is updated (e.g. from edit): cancel the old expiry and PAO reminders
+ * and schedule new ones for the updated dates.
  */
 export async function onProductUpdated(product: Product): Promise<void> {
   await cancelExpiryReminder(product.id);
+  await cancelPAOReminder(product.id);
   await scheduleExpiryReminder(product);
+  await schedulePAOReminder(product);
 }

@@ -27,6 +27,7 @@ import { SkeletonCard } from '../components/common/SkeletonLoader';
 import EmptyState from '../components/common/EmptyState';
 import { colors, spacing, radius, shadow, typography } from '../theme';
 import * as settingsStorage from '../services/settingsStorage';
+import { cancelExpiryReminder, cancelPAOReminder } from '../services/localNotificationService';
 
 type InventoryRouteParams = {
   categoryFilter?: ProductCategory;
@@ -164,6 +165,8 @@ export default function InventoryScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
+              await cancelExpiryReminder(product.id);
+              await cancelPAOReminder(product.id);
               await deleteProduct(product.id);
               Alert.alert('Success', 'Product deleted successfully');
             } catch (error) {
@@ -277,6 +280,9 @@ export default function InventoryScreen() {
         data={filteredAndSortedProducts}
         renderItem={renderProductItem}
         keyExtractor={(item) => item.id}
+        initialNumToRender={12}
+        maxToRenderPerBatch={10}
+        windowSize={10}
         contentContainerStyle={
           filteredAndSortedProducts.length === 0
             ? [styles.emptyListContainer, { paddingBottom: insets.bottom + TAB_BAR_HEIGHT + FAB_SIZE + FAB_BOTTOM_OFFSET }]

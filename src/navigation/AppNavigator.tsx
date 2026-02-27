@@ -15,6 +15,7 @@ export type RootStackParamList = {
         aiData?: AIFieldMap;
         aiFlatData?: Partial<Record<AIFieldKey, string>>;
         photoUri?: string;
+        scanNotFound?: boolean;
       }
     | undefined;
   ProductDetail: { productId: string };
