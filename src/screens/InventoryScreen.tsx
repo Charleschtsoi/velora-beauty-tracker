@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
+  Animated,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
@@ -37,6 +38,33 @@ type InventoryRouteProp = RouteProp<{ Inventory: InventoryRouteParams }, 'Invent
 const FAB_SIZE = 56;
 const FAB_BOTTOM_OFFSET = 24;
 const TAB_BAR_HEIGHT = 60;
+
+function FABWithEnterAnimation({
+  style,
+  onPress,
+  testID,
+}: {
+  style: object;
+  onPress: () => void;
+  testID?: string;
+}) {
+  const scale = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 24, bounciness: 8 }).start();
+  }, [scale]);
+  return (
+    <Animated.View style={[style, { transform: [{ scale }] }]}>
+      <TouchableOpacity
+        style={styles.fabInner}
+        onPress={onPress}
+        activeOpacity={0.85}
+        testID={testID}
+      >
+        <Ionicons name="add" size={28} color={colors.white} />
+      </TouchableOpacity>
+    </Animated.View>
+  );
+}
 
 export default function InventoryScreen() {
   const insets = useSafeAreaInsets();
@@ -151,13 +179,14 @@ export default function InventoryScreen() {
     navigation.getParent()?.navigate('AddProduct' as never);
   };
 
-  const renderProductItem = ({ item }: { item: Product }) => (
+  const renderProductItem = ({ item, index }: { item: Product; index: number }) => (
     <ProductListItem
       product={item}
       onPress={() => handleProductPress(item.id)}
       onDelete={() => handleDelete(item)}
       compact={compactList}
       testID={`product-item-${item.id}`}
+      entranceDelay={(index ?? 0) * 40}
     />
   );
 
@@ -198,7 +227,7 @@ export default function InventoryScreen() {
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <Ionicons name="leaf" size={24} color="#10b981" />
+          <Ionicons name="leaf" size={24} color={colors.primary} />
           <Text style={styles.logo}>Velora</Text>
         </View>
         <Text style={styles.headerTitle}>Your products</Text>
@@ -208,7 +237,7 @@ export default function InventoryScreen() {
             onPress={() => navigation.getParent()?.navigate('Categories' as never)}
             testID="browse-categories-button"
           >
-            <Ionicons name="grid-outline" size={22} color="#10b981" />
+            <Ionicons name="grid-outline" size={22} color={colors.primary} />
             <Text style={styles.categoriesButtonText}>Categories</Text>
           </TouchableOpacity>
         </View>
@@ -259,14 +288,11 @@ export default function InventoryScreen() {
       />
 
       {/* Floating Action Button */}
-      <TouchableOpacity
+      <FABWithEnterAnimation
         style={[styles.fab, { bottom: insets.bottom + TAB_BAR_HEIGHT + FAB_BOTTOM_OFFSET }]}
         onPress={handleAddProduct}
-        activeOpacity={0.8}
         testID="add-product-fab"
-      >
-        <Ionicons name="add" size={28} color="#ffffff" />
-      </TouchableOpacity>
+      />
 
       {/* Filter Menu */}
       <FilterMenu
@@ -316,10 +342,9 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   logo: {
+    ...typography.display,
     fontSize: 18,
-    fontWeight: '700',
     color: colors.primary,
-    letterSpacing: 1,
   },
   headerTitle: {
     ...typography.subtitle,
@@ -373,9 +398,16 @@ const styles = StyleSheet.create({
     width: FAB_SIZE,
     height: FAB_SIZE,
     borderRadius: FAB_SIZE / 2,
-    backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
     ...shadow.fab,
+  },
+  fabInner: {
+    width: FAB_SIZE,
+    height: FAB_SIZE,
+    borderRadius: FAB_SIZE / 2,
+    backgroundColor: colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

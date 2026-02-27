@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, TextInput, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { colors, spacing, radius, typography } from '../../theme';
 
 interface SearchBarProps {
   value: string;
@@ -28,13 +29,13 @@ export default function SearchBar({
   return (
     <View style={styles.container} testID={testID}>
       <View style={styles.searchInputContainer}>
-        <Ionicons name="search" size={20} color="#9ca3af" style={styles.searchIcon} />
+        <Ionicons name="search" size={20} color={colors.textTertiary} style={styles.searchIcon} />
         <TextInput
           style={styles.searchInput}
           value={value}
           onChangeText={onChangeText}
           placeholder={placeholder}
-          placeholderTextColor="#9ca3af"
+          placeholderTextColor={colors.textTertiary}
           testID="search-input"
         />
         {value.length > 0 && (
@@ -43,7 +44,7 @@ export default function SearchBar({
             style={styles.clearButton}
             testID="clear-search-button"
           >
-            <Ionicons name="close-circle" size={20} color="#9ca3af" />
+            <Ionicons name="close-circle" size={20} color={colors.textTertiary} />
           </TouchableOpacity>
         )}
       </View>
@@ -53,7 +54,7 @@ export default function SearchBar({
           onPress={openFilterSort}
           testID="filter-sort-button"
         >
-          <Ionicons name="options-outline" size={18} color="#10b981" style={styles.filterSortIcon} />
+          <Ionicons name="options-outline" size={18} color={colors.primary} style={styles.filterSortIcon} />
           <Text style={styles.filterSortLabel}>{filterSortLabel}</Text>
         </TouchableOpacity>
       ) : (
@@ -64,7 +65,7 @@ export default function SearchBar({
               onPress={onFilterPress}
               testID="filter-button"
             >
-              <Ionicons name="options" size={20} color="#10b981" />
+              <Ionicons name="options" size={20} color={colors.primary} />
             </TouchableOpacity>
           )}
           {onSortPress && (
@@ -73,7 +74,7 @@ export default function SearchBar({
               onPress={onSortPress}
               testID="sort-button"
             >
-              <Ionicons name="swap-vertical" size={20} color="#10b981" />
+              <Ionicons name="swap-vertical" size={20} color={colors.primary} />
             </TouchableOpacity>
           )}
         </>
@@ -86,36 +87,36 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 16,
+    gap: spacing.xs,
+    marginBottom: spacing.md,
   },
   searchInputContainer: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f3f4f6',
-    borderRadius: 12,
-    paddingHorizontal: 12,
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.sm,
     minHeight: 44,
   },
   searchIcon: {
-    marginRight: 8,
+    marginRight: spacing.xs,
   },
   searchInput: {
     flex: 1,
     fontSize: 16,
-    color: '#1f2937',
+    color: colors.textPrimary,
     paddingVertical: 10,
   },
   clearButton: {
-    marginLeft: 8,
-    padding: 4,
+    marginLeft: spacing.xs,
+    padding: spacing.xxs,
   },
   actionButton: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#f0fdf4',
+    backgroundColor: colors.primaryTint,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -123,17 +124,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     height: 44,
-    paddingHorizontal: 12,
+    paddingHorizontal: spacing.sm,
     borderRadius: 22,
-    backgroundColor: '#f0fdf4',
+    backgroundColor: colors.primaryTint,
     minWidth: 44,
   },
   filterSortIcon: {
     marginRight: 6,
   },
   filterSortLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#10b981',
+    ...typography.bodyStrong,
+    color: colors.primary,
   },
 });

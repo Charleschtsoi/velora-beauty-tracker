@@ -22,27 +22,35 @@ export const radius = {
 } as const;
 
 /**
- * Shadow presets (elevation).
+ * Shadow presets (elevation). Softer, premium feel.
  */
+const shadowColor = '#1f2937';
 export const shadow = {
   card: {
-    shadowColor: '#000',
+    shadowColor,
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
     elevation: 2,
   },
+  cardSubtle: {
+    shadowColor,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 1,
+  },
   cardRaised: {
-    shadowColor: '#000',
+    shadowColor,
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
     elevation: 3,
   },
   fab: {
-    shadowColor: '#10b981',
+    shadowColor: '#1f2937',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.2,
     shadowRadius: 8,
     elevation: 5,
   },

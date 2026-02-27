@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useRef, useEffect } from 'react';
+import { View, Text, Image, TouchableOpacity, StyleSheet, Animated } from 'react-native';
 import { Product } from '../../types/product.types';
 import { getExpirationStatus, formatDate } from '../../utils/dateHelpers';
 import { ExpirationStatus } from '../../types/product.types';
@@ -9,6 +9,8 @@ interface ProductCardProps {
   product: Product;
   onPress: () => void;
   testID?: string;
+  /** Optional delay in ms for staggered entrance (e.g. index * 50). */
+  entranceDelay?: number;
 }
 
 const getStatusColor = (status: ExpirationStatus): string => {
@@ -26,15 +28,27 @@ const getStatusColor = (status: ExpirationStatus): string => {
   }
 };
 
-export default function ProductCard({ product, onPress, testID }: ProductCardProps) {
+export default function ProductCard({ product, onPress, testID, entranceDelay = 0 }: ProductCardProps) {
   const status = getExpirationStatus(product.expirationDate);
   const statusColor = getStatusColor(status);
+  const opacity = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new Animated.Value(10)).current;
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      Animated.parallel([
+        Animated.timing(opacity, { toValue: 1, duration: 260, useNativeDriver: true }),
+        Animated.timing(translateY, { toValue: 0, duration: 260, useNativeDriver: true }),
+      ]).start();
+    }, entranceDelay);
+    return () => clearTimeout(timer);
+  }, [entranceDelay, opacity, translateY]);
 
   return (
+    <Animated.View style={{ opacity, transform: [{ translateY }] }}>
     <TouchableOpacity
       style={styles.card}
       onPress={onPress}
-      activeOpacity={0.7}
+      activeOpacity={0.72}
       testID={testID}
     >
       {product.photoUrl ? (
@@ -64,6 +78,7 @@ export default function ProductCard({ product, onPress, testID }: ProductCardPro
         </View>
       </View>
     </TouchableOpacity>
+    </Animated.View>
   );
 }
 
@@ -71,21 +86,21 @@ const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
     backgroundColor: colors.surface,
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
     padding: spacing.sm,
     marginVertical: spacing.xs,
-    ...shadow.card,
+    ...shadow.cardSubtle,
   },
   image: {
-    width: 60,
-    height: 60,
-    borderRadius: radius.sm,
+    width: 72,
+    height: 72,
+    borderRadius: radius.md,
     marginRight: spacing.sm,
   },
   imagePlaceholder: {
-    width: 60,
-    height: 60,
-    borderRadius: radius.sm,
+    width: 72,
+    height: 72,
+    borderRadius: radius.md,
     marginRight: spacing.sm,
     justifyContent: 'center',
     alignItems: 'center',

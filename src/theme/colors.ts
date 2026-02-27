@@ -1,6 +1,6 @@
 /**
- * Design tokens: palette for Velora (OL-friendly, premium feel).
- * Primary green retained; secondary accent for warmth; status and surfaces.
+ * Design tokens: palette for Velora (fashion-forward, premium feel).
+ * Warm neutral background; primary green as accent; soft editorial surfaces.
  */
 export const colors = {
   // Primary & accent
@@ -10,9 +10,9 @@ export const colors = {
   secondary: '#e11d48', // soft rose accent for highlights (beauty-adjacent)
   secondaryLight: '#ffe4e6',
 
-  // Surfaces
-  background: '#f9fafb',
-  backgroundWarm: '#fafaf9', // barely warm grey for key screens
+  // Surfaces (warm editorial)
+  background: '#faf9f7', // warm off-white default
+  backgroundWarm: '#fafaf9',
   surface: '#ffffff',
   surfaceMuted: '#f3f4f6',
 
@@ -24,6 +24,7 @@ export const colors = {
   // Borders & dividers
   border: '#e5e7eb',
   borderLight: '#f3f4f6',
+  iconMuted: '#d1d5db', // chevrons, disabled icons
 
   // Status (expiry)
   statusExpired: '#ef4444',

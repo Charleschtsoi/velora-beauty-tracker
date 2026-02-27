@@ -28,6 +28,8 @@ export default function AppNavigator() {
     <Stack.Navigator
       screenOptions={{
         headerShown: false,
+        animation: 'slide_from_right',
+        gestureEnabled: true,
       }}
     >
       <Stack.Screen name="MainTabs" component={TabNavigator} />
@@ -36,7 +38,9 @@ export default function AppNavigator() {
         component={AddProductScreen}
         options={{
           presentation: 'modal',
+          animation: 'slide_from_bottom',
           headerShown: false,
+          gestureEnabled: true,
         }}
       />
       <Stack.Screen
@@ -44,7 +48,9 @@ export default function AppNavigator() {
         component={ProductDetailScreen}
         options={{
           presentation: 'card',
+          animation: 'slide_from_right',
           headerShown: false,
+          gestureEnabled: true,
         }}
       />
       <Stack.Screen
@@ -52,7 +58,9 @@ export default function AppNavigator() {
         component={CategoriesScreen}
         options={{
           presentation: 'card',
+          animation: 'slide_from_right',
           headerShown: false,
+          gestureEnabled: true,
         }}
       />
     </Stack.Navigator>
