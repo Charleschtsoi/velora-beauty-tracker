@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -6,8 +6,8 @@ import {
   FlatList,
   TouchableOpacity,
   Alert,
-  ActivityIndicator,
   Animated,
+  ScrollView,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
@@ -40,6 +40,36 @@ const FAB_SIZE = 56;
 const FAB_BOTTOM_OFFSET = 24;
 const TAB_BAR_HEIGHT = 60;
 
+const CATEGORY_LABELS: Record<ProductCategory, string> = {
+  [ProductCategory.SKINCARE]: 'Skincare',
+  [ProductCategory.MAKEUP]: 'Makeup',
+  [ProductCategory.HAIRCARE]: 'Haircare',
+  [ProductCategory.FRAGRANCE]: 'Fragrance',
+  [ProductCategory.BODYCARE]: 'Bodycare',
+  [ProductCategory.NAILCARE]: 'Nailcare',
+  [ProductCategory.OTHER]: 'Other',
+};
+
+const STATUS_CHIP_LABELS: Record<ExpirationStatus, string> = {
+  [ExpirationStatus.SAFE]: 'Safe',
+  [ExpirationStatus.EXPIRING_SOON]: 'Expiring soon',
+  [ExpirationStatus.WARNING]: 'Warning',
+  [ExpirationStatus.EXPIRED]: 'Expired',
+};
+
+function sortChipLabel(option: SortOption): string {
+  switch (option) {
+    case 'expiry_date':
+      return 'Expiry date';
+    case 'name':
+      return 'Name A–Z';
+    case 'recently_added':
+      return 'Recently added';
+    default:
+      return 'Sort';
+  }
+}
+
 function FABWithEnterAnimation({
   style,
   onPress,
@@ -67,13 +97,14 @@ function FABWithEnterAnimation({
   );
 }
 
+type FilterChipConfig = { key: string; label: string; onClear: () => void };
+
 export default function InventoryScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const route = useRoute<InventoryRouteProp>();
-  const { products, loading, deleteProduct, fetchProducts } = useProducts();
+  const { products, loading, deleteProduct } = useProducts();
 
-  // Search and filter state
   const [searchQuery, setSearchQuery] = useState('');
   const [filterMenuVisible, setFilterMenuVisible] = useState(false);
   const [sortOption, setSortOption] = useState<SortOption>('recently_added');
@@ -90,7 +121,6 @@ export default function InventoryScreen() {
     settingsStorage.setCompactList(value);
   };
 
-  // Handle route params for filtering
   useEffect(() => {
     if (route.params?.categoryFilter) {
       setCategoryFilter(route.params.categoryFilter);
@@ -106,11 +136,9 @@ export default function InventoryScreen() {
     }
   }, [route.params]);
 
-  // Filter and sort products
   const filteredAndSortedProducts = useMemo(() => {
     let filtered = [...products];
 
-    // Search filter
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase().trim();
       filtered = filtered.filter(
@@ -121,19 +149,14 @@ export default function InventoryScreen() {
       );
     }
 
-    // Status filter
     if (statusFilter !== 'all') {
-      filtered = filtered.filter(
-        (p) => getExpirationStatus(p.expirationDate) === statusFilter
-      );
+      filtered = filtered.filter((p) => getExpirationStatus(p.expirationDate) === statusFilter);
     }
 
-    // Category filter
     if (categoryFilter !== 'all') {
       filtered = filtered.filter((p) => p.category === categoryFilter);
     }
 
-    // Sort
     filtered.sort((a, b) => {
       switch (sortOption) {
         case 'expiry_date':
@@ -149,6 +172,82 @@ export default function InventoryScreen() {
 
     return filtered;
   }, [products, searchQuery, statusFilter, categoryFilter, sortOption]);
+
+  const filterChips = useMemo((): FilterChipConfig[] => {
+    const chips: FilterChipConfig[] = [];
+    const q = searchQuery.trim();
+    if (q) {
+      chips.push({
+        key: 'search',
+        label: `“${q.length > 18 ? `${q.slice(0, 18)}…` : q}”`,
+        onClear: () => setSearchQuery(''),
+      });
+    }
+    if (statusFilter !== 'all') {
+      chips.push({
+        key: 'status',
+        label: STATUS_CHIP_LABELS[statusFilter],
+        onClear: () => setStatusFilter('all'),
+      });
+    }
+    if (categoryFilter !== 'all') {
+      chips.push({
+        key: 'category',
+        label: CATEGORY_LABELS[categoryFilter],
+        onClear: () => setCategoryFilter('all'),
+      });
+    }
+    if (sortOption !== 'recently_added') {
+      chips.push({
+        key: 'sort',
+        label: sortChipLabel(sortOption),
+        onClear: () => setSortOption('recently_added'),
+      });
+    }
+    return chips;
+  }, [searchQuery, statusFilter, categoryFilter, sortOption]);
+
+  const hasActiveFilters =
+    !!searchQuery.trim() || statusFilter !== 'all' || categoryFilter !== 'all' || sortOption !== 'recently_added';
+
+  const clearAllFilters = useCallback(() => {
+    setSearchQuery('');
+    setStatusFilter('all');
+    setCategoryFilter('all');
+    setSortOption('recently_added');
+  }, []);
+
+  const sectionEyebrow = useMemo(() => {
+    if (searchQuery.trim() || statusFilter !== 'all' || categoryFilter !== 'all') {
+      return 'Filtered';
+    }
+    if (sortOption === 'expiry_date') {
+      return 'By date';
+    }
+    if (sortOption === 'name') {
+      return 'Alphabetical';
+    }
+    return 'New on your shelf';
+  }, [searchQuery, statusFilter, categoryFilter, sortOption]);
+
+  const sectionTitle = useMemo(() => {
+    if (searchQuery.trim() || statusFilter !== 'all' || categoryFilter !== 'all') {
+      return `${filteredAndSortedProducts.length} ${filteredAndSortedProducts.length === 1 ? 'product' : 'products'}`;
+    }
+    if (sortOption === 'expiry_date') {
+      return 'Soonest expiry first';
+    }
+    if (sortOption === 'name') {
+      return 'By name (A–Z)';
+    }
+    return 'Recently added';
+  }, [
+    searchQuery,
+    statusFilter,
+    categoryFilter,
+    sortOption,
+    filteredAndSortedProducts.length,
+  ]);
 
   const handleProductPress = (productId: string) => {
     navigation.getParent()?.navigate('ProductDetail' as never, { productId });
@@ -209,11 +308,23 @@ export default function InventoryScreen() {
     />
   );
 
+  const listHeader = useMemo(
+    () =>
+      filteredAndSortedProducts.length > 0 ? (
+        <View style={styles.listSectionHeader}>
+          <Text style={styles.sectionEyebrow}>{sectionEyebrow}</Text>
+          <Text style={styles.sectionTitle}>{sectionTitle}</Text>
+        </View>
+      ) : null,
+    [filteredAndSortedProducts.length, sectionEyebrow, sectionTitle]
+  );
+
   if (loading && products.length === 0) {
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Your products</Text>
+        <View style={styles.topBar}>
+          <Text style={styles.logo}>Velora</Text>
+          <View style={{ width: 40 }} />
         </View>
         <View style={styles.skeletonContainer}>
           <SkeletonCard />
@@ -227,65 +338,72 @@ export default function InventoryScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <Ionicons name="leaf" size={24} color={colors.primary} />
-          <Text style={styles.logo}>Velora</Text>
-        </View>
-        <Text style={styles.headerTitle}>Your products</Text>
-        <View style={styles.headerRight}>
-          <TouchableOpacity
-            style={styles.categoriesButton}
-            onPress={() => navigation.getParent()?.navigate('Categories' as never)}
-            testID="browse-categories-button"
-          >
-            <Ionicons name="grid-outline" size={22} color={colors.primary} />
-            <Text style={styles.categoriesButtonText}>Categories</Text>
-          </TouchableOpacity>
-        </View>
+      <View style={styles.topBar}>
+        <Text style={styles.logo}>Velora</Text>
+        <TouchableOpacity
+          style={styles.categoriesIconButton}
+          onPress={() => navigation.getParent()?.navigate('Categories' as never)}
+          testID="browse-categories-button"
+          accessibilityLabel="Categories"
+        >
+          <Ionicons name="grid-outline" size={22} color={colors.primary} />
+        </TouchableOpacity>
       </View>
 
-      {/* Search and Filter */}
-      <View style={styles.searchContainer}>
+      <View style={styles.searchBlock}>
         <SearchBar
           value={searchQuery}
           onChangeText={setSearchQuery}
           onFilterPress={() => setFilterMenuVisible(true)}
           onSortPress={() => setFilterMenuVisible(true)}
           filterSortLabel="Filter & sort"
+          variant="editorial"
+          bottomSpacing={false}
           testID="search-bar"
         />
+        {hasActiveFilters && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.chipsRow}
+            style={styles.chipsScroll}
+          >
+            {filterChips.map((chip) => (
+              <TouchableOpacity
+                key={chip.key}
+                style={styles.filterChip}
+                onPress={chip.onClear}
+                activeOpacity={0.85}
+                accessibilityRole="button"
+                accessibilityLabel={`Remove filter ${chip.label}`}
+              >
+                <Text style={styles.filterChipText}>{chip.label}</Text>
+                <Ionicons name="close-circle" size={18} color={colors.primary} />
+              </TouchableOpacity>
+            ))}
+            {filterChips.length > 1 && (
+              <TouchableOpacity style={styles.clearAllChip} onPress={clearAllFilters} activeOpacity={0.85}>
+                <Text style={styles.clearAllChipText}>Clear all</Text>
+              </TouchableOpacity>
+            )}
+          </ScrollView>
+        )}
       </View>
 
-      {/* Section Header */}
-      {filteredAndSortedProducts.length > 0 && (
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>
-            {searchQuery || statusFilter !== 'all' || categoryFilter !== 'all'
-              ? `Results (${filteredAndSortedProducts.length})`
-              : sortOption === 'expiry_date'
-                ? 'By expiry date'
-                : sortOption === 'name'
-                  ? 'By name (A–Z)'
-                  : sortOption === 'recently_added'
-                    ? 'Recently added'
-                    : 'Your products'}
-          </Text>
-        </View>
-      )}
-
-      {/* Product List */}
       <FlatList
         data={filteredAndSortedProducts}
         renderItem={renderProductItem}
         keyExtractor={(item) => item.id}
+        ListHeaderComponent={listHeader}
         initialNumToRender={12}
         maxToRenderPerBatch={10}
         windowSize={10}
         contentContainerStyle={
           filteredAndSortedProducts.length === 0
-            ? [styles.emptyListContainer, { paddingBottom: insets.bottom + TAB_BAR_HEIGHT + FAB_SIZE + FAB_BOTTOM_OFFSET }]
+            ? [
+                styles.emptyListContainer,
+                { paddingBottom: insets.bottom + TAB_BAR_HEIGHT + FAB_SIZE + FAB_BOTTOM_OFFSET },
+              ]
             : [styles.listContainer, { paddingBottom: insets.bottom + TAB_BAR_HEIGHT + FAB_SIZE + FAB_BOTTOM_OFFSET }]
         }
         ListEmptyComponent={renderEmptyState}
@@ -293,14 +411,12 @@ export default function InventoryScreen() {
         testID="product-list"
       />
 
-      {/* Floating Action Button */}
       <FABWithEnterAnimation
         style={[styles.fab, { bottom: insets.bottom + TAB_BAR_HEIGHT + FAB_BOTTOM_OFFSET }]}
         onPress={handleAddProduct}
         testID="add-product-fab"
       />
 
-      {/* Filter Menu */}
       <FilterMenu
         visible={filterMenuVisible}
         onClose={() => setFilterMenuVisible(false)}
@@ -320,83 +436,101 @@ export default function InventoryScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.cream,
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: spacing.sm,
-    ...typography.bodyLarge,
-    color: colors.textSecondary,
-  },
-  header: {
+  topBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    backgroundColor: colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.md,
   },
   logo: {
     ...typography.display,
-    fontSize: 18,
     color: colors.primary,
   },
-  headerTitle: {
-    ...typography.subtitle,
-    color: colors.textPrimary,
-    flex: 1,
-    textAlign: 'center',
+  categoriesIconButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.mintSoft,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.primaryLight,
   },
-  headerRight: {
-    minWidth: 100,
-    alignItems: 'flex-end',
+  searchBlock: {
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.sm,
   },
-  categoriesButton: {
+  chipsScroll: {
+    marginTop: spacing.sm,
+    maxHeight: 44,
+  },
+  chipsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingRight: spacing.lg,
+  },
+  filterChip: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xxs,
-    paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.sm,
-  },
-  categoriesButtonText: {
-    ...typography.bodyStrong,
-    color: colors.primary,
-  },
-  searchContainer: {
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.md,
+    paddingVertical: spacing.xxs + 2,
+    paddingLeft: spacing.sm,
+    paddingRight: spacing.xs,
+    borderRadius: radius.full,
     backgroundColor: colors.surface,
-    paddingBottom: spacing.xs,
+    borderWidth: 1,
+    borderColor: colors.primaryLight,
   },
-  sectionHeader: {
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.xs,
+  filterChipText: {
+    ...typography.caption,
+    fontWeight: '600',
+    color: colors.textPrimary,
+    maxWidth: 160,
+  },
+  clearAllChip: {
+    paddingVertical: spacing.xxs + 2,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.full,
+    backgroundColor: colors.blush,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+  },
+  clearAllChipText: {
+    ...typography.caption,
+    fontWeight: '700',
+    color: colors.textSecondary,
+  },
+  listSectionHeader: {
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.xs,
+  },
+  sectionEyebrow: {
+    ...typography.sectionLabel,
+    color: colors.textTertiary,
+    marginBottom: spacing.xxs,
   },
   sectionTitle: {
-    ...typography.subtitle,
+    ...typography.title,
     color: colors.textPrimary,
+    letterSpacing: -0.2,
+    marginBottom: spacing.sm,
   },
   listContainer: {
-    padding: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.xs,
   },
   emptyListContainer: {
     flex: 1,
     justifyContent: 'center',
+    paddingHorizontal: spacing.lg,
   },
   skeletonContainer: {
-    padding: spacing.md,
+    padding: spacing.lg,
   },
   fab: {
     position: 'absolute',

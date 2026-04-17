@@ -28,9 +28,25 @@ const getStatusColor = (status: ExpirationStatus): string => {
   }
 };
 
+const getStatusTint = (status: ExpirationStatus): string => {
+  switch (status) {
+    case ExpirationStatus.EXPIRED:
+      return colors.statusExpiredBg;
+    case ExpirationStatus.EXPIRING_SOON:
+      return colors.statusExpiringSoonBg;
+    case ExpirationStatus.WARNING:
+      return colors.statusWarningBg;
+    case ExpirationStatus.SAFE:
+      return colors.statusSafeBg;
+    default:
+      return colors.surfaceMuted;
+  }
+};
+
 export default function ProductCard({ product, onPress, testID, entranceDelay = 0 }: ProductCardProps) {
   const status = getExpirationStatus(product.expirationDate);
   const statusColor = getStatusColor(status);
+  const statusTint = getStatusTint(status);
   const opacity = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(10)).current;
   useEffect(() => {
@@ -45,98 +61,101 @@ export default function ProductCard({ product, onPress, testID, entranceDelay = 
 
   return (
     <Animated.View style={{ opacity, transform: [{ translateY }] }}>
-    <TouchableOpacity
-      style={styles.card}
-      onPress={onPress}
-      activeOpacity={0.72}
-      testID={testID}
-    >
-      {product.photoUrl ? (
-        <Image source={{ uri: product.photoUrl }} style={styles.image} />
-      ) : (
-        <View style={styles.imagePlaceholder}>
-          <Text style={styles.placeholderText}>
-            {product.name.charAt(0).toUpperCase()}
-          </Text>
-        </View>
-      )}
-      
-      <View style={styles.content}>
-        <Text style={styles.name} numberOfLines={1}>
-          {product.name}
-        </Text>
-        {product.brand && (
-          <Text style={styles.brand} numberOfLines={1}>
-            {product.brand}
-          </Text>
+      <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.72} testID={testID}>
+        {product.photoUrl ? (
+          <Image source={{ uri: product.photoUrl }} style={styles.image} />
+        ) : (
+          <View style={styles.imagePlaceholder}>
+            <Text style={styles.placeholderText}>{product.name.charAt(0).toUpperCase()}</Text>
+          </View>
         )}
-        <View style={styles.dateContainer}>
-          <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
-          <Text style={styles.date}>
-            Expires: {formatDate(product.expirationDate)}
+
+        <View style={styles.content}>
+          <Text style={styles.name} numberOfLines={2}>
+            {product.name}
           </Text>
+          {product.brand ? (
+            <Text style={styles.brand} numberOfLines={1}>
+              {product.brand}
+            </Text>
+          ) : null}
+          <View style={[styles.expiryPill, { backgroundColor: statusTint }]}>
+            <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
+            <Text style={[styles.expiryText, { color: colors.textPrimary }]}>Expires {formatDate(product.expirationDate)}</Text>
+          </View>
         </View>
-      </View>
-    </TouchableOpacity>
+      </TouchableOpacity>
     </Animated.View>
   );
 }
+
+const IMAGE_SIZE = 88;
 
 const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
     backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    padding: spacing.sm,
+    borderRadius: radius.xl,
+    padding: spacing.md,
     marginVertical: spacing.xs,
-    ...shadow.cardSubtle,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    ...shadow.card,
   },
   image: {
-    width: 72,
-    height: 72,
-    borderRadius: radius.md,
-    marginRight: spacing.sm,
+    width: IMAGE_SIZE,
+    height: IMAGE_SIZE,
+    borderRadius: radius.lg,
+    marginRight: spacing.md,
+    backgroundColor: colors.surfaceMuted,
   },
   imagePlaceholder: {
-    width: 72,
-    height: 72,
-    borderRadius: radius.md,
-    marginRight: spacing.sm,
+    width: IMAGE_SIZE,
+    height: IMAGE_SIZE,
+    borderRadius: radius.lg,
+    marginRight: spacing.md,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: colors.primaryTint,
+    backgroundColor: colors.mintSoft,
   },
   placeholderText: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: '600',
     color: colors.primary,
   },
   content: {
     flex: 1,
     justifyContent: 'center',
+    minHeight: IMAGE_SIZE,
   },
   name: {
     ...typography.bodyLargeStrong,
+    fontSize: 16,
     color: colors.textPrimary,
     marginBottom: spacing.xxs,
+    letterSpacing: -0.2,
   },
   brand: {
     ...typography.body,
     color: colors.textSecondary,
-    marginBottom: spacing.xs,
+    marginBottom: spacing.sm,
   },
-  dateContainer: {
+  expiryPill: {
     flexDirection: 'row',
     alignItems: 'center',
+    alignSelf: 'flex-start',
+    paddingVertical: spacing.xxs,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.full,
   },
   statusDot: {
-    width: 8,
-    height: 8,
+    width: 7,
+    height: 7,
     borderRadius: 4,
     marginRight: spacing.xs,
   },
-  date: {
+  expiryText: {
     ...typography.caption,
-    color: colors.textSecondary,
+    fontWeight: '600',
   },
 });

@@ -9,6 +9,7 @@ import {
   Vibration,
   Platform,
   ActivityIndicator,
+  Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { CameraView, useCameraPermissions, BarcodeScanningResult, type CameraType } from 'expo-camera';
@@ -21,9 +22,18 @@ import { useProducts } from '../context/ProductContext';
 import { DEMO_MODE } from '../config/demoMode';
 import { DEMO_PRODUCTS } from '../config/demoProducts';
 import { onProductSaved } from '../services/localNotificationService';
+import { colors, spacing, radius, shadow, typography } from '../theme';
 
 const { width, height } = Dimensions.get('window');
-const SCAN_AREA_SIZE = width * 0.7;
+/** Portrait-leaning frame: better for tubes, bottles, vertical labels */
+const SCAN_FRAME_WIDTH = width * 0.72;
+const SCAN_FRAME_HEIGHT = Math.min(width * 0.5, height * 0.36);
+
+const IDLE_TIPS = [
+  'Flat surface works best',
+  'Try torch in dim light',
+  'No barcode? Use AI photo',
+] as const;
 
 // Vibration pattern for successful scan
 const VIBRATION_PATTERN = 100;
@@ -49,6 +59,7 @@ export default function ScanScreen() {
   const knownFieldsRef = useRef<Partial<Record<AIFieldKey, string>>>({});
   const demoProductIndexRef = useRef(0);
   const processingScanRef = useRef(false); // prevent double-handling one scan
+  const scanLineAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (permission?.granted) {
@@ -62,6 +73,29 @@ export default function ScanScreen() {
     const t = setTimeout(() => setCameraReady(true), 2500);
     return () => clearTimeout(t);
   }, [DEMO_MODE, scanMode, isScanning, cameraReady]);
+
+  useEffect(() => {
+    if (!isScanning || scanMode !== 'barcode') {
+      scanLineAnim.setValue(0);
+      return;
+    }
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(scanLineAnim, {
+          toValue: 1,
+          duration: 2400,
+          useNativeDriver: true,
+        }),
+        Animated.timing(scanLineAnim, {
+          toValue: 0,
+          duration: 2400,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [isScanning, scanMode, scanLineAnim]);
 
   // Cleanup when component unmounts or when leaving scanning mode
   useEffect(() => {
@@ -246,10 +280,9 @@ export default function ScanScreen() {
       return;
     }
 
+    let photo: { uri: string } | null = null;
     try {
       setIsAnalyzing(true);
-
-      let photo: { uri: string } | null = null;
       const takePicture = cameraRef.current.takePictureAsync({
         quality: 0.8,
         base64: false,
@@ -314,9 +347,10 @@ export default function ScanScreen() {
       }
 
       if (!photo?.uri) throw new Error('Failed to capture photo');
+      const capturedPhotoUri = photo.uri;
 
       showToast('Capturing and analyzing image...', 'info');
-      const analysisResult = await analyzeProductImage(photo.uri, knownFieldsRef.current);
+      const analysisResult = await analyzeProductImage(capturedPhotoUri, knownFieldsRef.current);
 
       if (!analysisResult.success || !analysisResult.fields) {
         throw new Error(analysisResult.error || 'Failed to analyze image');
@@ -336,7 +370,7 @@ export default function ScanScreen() {
         navigation.getParent()?.navigate('AddProduct' as never, {
           aiData: analysisResult.fields,
           aiFlatData: analysisResult.flatData,
-          photoUri: photo.uri,
+          photoUri: capturedPhotoUri,
         });
         setIsAnalyzing(false);
         setScanned(false);
@@ -358,7 +392,7 @@ export default function ScanScreen() {
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#10b981" />
+          <ActivityIndicator size="large" color={colors.primary} />
           <Text style={styles.loadingText}>Requesting camera permission...</Text>
         </View>
       </SafeAreaView>
@@ -370,7 +404,7 @@ export default function ScanScreen() {
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
         <View style={styles.permissionContainer}>
-          <Ionicons name="camera-outline" size={64} color="#9ca3af" />
+          <Ionicons name="camera-outline" size={64} color={colors.textTertiary} />
           <Text style={styles.permissionTitle}>Camera Permission Required</Text>
           <Text style={styles.permissionText}>
             We need access to your camera to scan product barcodes. Please grant permission in your device settings.
@@ -399,7 +433,7 @@ export default function ScanScreen() {
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
         <View style={styles.permissionContainer}>
-          <Ionicons name="alert-circle-outline" size={64} color="#ef4444" />
+          <Ionicons name="alert-circle-outline" size={64} color={colors.statusExpired} />
           <Text style={styles.permissionTitle}>Camera Not Available</Text>
           <Text style={styles.permissionText}>
             Camera is not available on this device. Please use manual entry to add products.
@@ -425,7 +459,7 @@ export default function ScanScreen() {
       )}
       {isAddingDemo && (
         <View style={styles.thinkingOverlay}>
-          <ActivityIndicator size="large" color="#ffffff" />
+          <ActivityIndicator size="large" color={colors.white} />
           <Text style={styles.thinkingText}>Adding to your collection...</Text>
         </View>
       )}
@@ -476,31 +510,47 @@ export default function ScanScreen() {
                 <Ionicons
                   name={flashlightEnabled ? 'flash' : 'flash-off'}
                   size={24}
-                  color="#ffffff"
+                  color={colors.white}
                 />
               </TouchableOpacity>
 
-              {/* Scanning area with corner guides */}
+              {scanMode === 'barcode' && !scanned && (
+                <View style={styles.instructionChipTop} pointerEvents="none">
+                  <Text style={styles.instructionChipText}>
+                    Align the barcode on the flat side of the package.
+                  </Text>
+                </View>
+              )}
+
+              {/* Scanning area with soft corner brackets */}
               <View style={styles.scanArea}>
-                {/* Top-left corner */}
                 <View style={[styles.corner, styles.topLeft]} />
-                {/* Top-right corner */}
                 <View style={[styles.corner, styles.topRight]} />
-                {/* Bottom-left corner */}
                 <View style={[styles.corner, styles.bottomLeft]} />
-                {/* Bottom-right corner */}
                 <View style={[styles.corner, styles.bottomRight]} />
-                
-                {/* Center dot with crosshair */}
-                <View style={styles.centerDot} />
-                <View style={[styles.crosshair, styles.crosshairHorizontal]} />
-                <View style={[styles.crosshair, styles.crosshairVertical]} />
+                {scanMode === 'barcode' && !scanned && (
+                  <Animated.View
+                    pointerEvents="none"
+                    style={[
+                      styles.scanLine,
+                      {
+                        transform: [
+                          {
+                            translateY: scanLineAnim.interpolate({
+                              inputRange: [0, 1],
+                              outputRange: [6, SCAN_FRAME_HEIGHT - 10],
+                            }),
+                          },
+                        ],
+                      },
+                    ]}
+                  />
+                )}
               </View>
 
-              {/* Scanning indicator */}
               {!scanned && scanMode === 'barcode' && (
                 <View style={styles.scanningIndicator}>
-                  <Text style={styles.scanningText}>Position barcode within the frame</Text>
+                  <Text style={styles.scanningText}>Hold steady — glossy labels may need the torch</Text>
                 </View>
               )}
 
@@ -517,7 +567,7 @@ export default function ScanScreen() {
                   </TouchableOpacity>
                   <Text style={styles.captureHintText}>
                     {cameraReady
-                      ? 'Position product label in frame and tap to capture'
+                      ? 'Fill the frame with the product name and size, then tap to capture'
                       : 'Waiting for camera...'}
                   </Text>
                 </View>
@@ -526,7 +576,7 @@ export default function ScanScreen() {
               {/* AI Analyzing indicator */}
               {isAnalyzing && (
                 <View style={styles.analyzingContainer}>
-                  <ActivityIndicator size="large" color="#ffffff" />
+                  <ActivityIndicator size="large" color={colors.white} />
                   <Text style={styles.analyzingText}>Analyzing product...</Text>
                 </View>
               )}
@@ -534,11 +584,20 @@ export default function ScanScreen() {
           </CameraView>
         ) : (
           <View style={styles.placeholderView}>
-            <Ionicons name="camera-outline" size={80} color="#d1d5db" />
-            <Text style={styles.placeholderText}>Ready to scan</Text>
-            <Text style={styles.placeholderSubtext}>
-              Tap the button below to start scanning
+            <View style={styles.idleIconWrap}>
+              <Ionicons name="camera-outline" size={40} color={colors.primary} />
+            </View>
+            <Text style={styles.idleHeadline}>Add a product in seconds</Text>
+            <Text style={styles.idleSubcopy}>
+              Use barcode for boxed items, or AI photo for labels and curved packaging.
             </Text>
+            <View style={styles.tipsWrap}>
+              {IDLE_TIPS.map((tip) => (
+                <View key={tip} style={styles.tipChip}>
+                  <Text style={styles.tipChipText}>{tip}</Text>
+                </View>
+              ))}
+            </View>
           </View>
         )}
       </View>
@@ -558,7 +617,7 @@ export default function ScanScreen() {
             <Ionicons
               name="barcode-outline"
               size={20}
-              color={scanMode === 'barcode' ? '#ffffff' : '#6b7280'}
+              color={scanMode === 'barcode' ? colors.primary : colors.textSecondary}
             />
             <Text
               style={[
@@ -589,7 +648,11 @@ export default function ScanScreen() {
               name="sparkles-outline"
               size={20}
               color={
-                scanMode === 'ai' ? '#ffffff' : !aiModeAvailable ? '#d1d5db' : '#6b7280'
+                scanMode === 'ai'
+                  ? colors.primary
+                  : !aiModeAvailable
+                    ? colors.iconMuted
+                    : colors.textSecondary
               }
             />
             <Text
@@ -615,17 +678,15 @@ export default function ScanScreen() {
           testID="scan-barcode-button"
         >
           {isAnalyzing || lookupInProgress ? (
-            <ActivityIndicator size="small" color="#ffffff" />
+            <ActivityIndicator size="small" color={colors.white} />
           ) : (
             <>
               <Ionicons
                 name={scanMode === 'ai' ? 'camera' : 'search'}
                 size={24}
-                color="#ffffff"
+                color={colors.white}
               />
-              <Text style={styles.scanButtonText}>
-                {scanMode === 'ai' ? 'Start AI Capture' : 'Scan Barcode'}
-              </Text>
+              <Text style={styles.scanButtonText}>Open camera</Text>
             </>
           )}
         </TouchableOpacity>
@@ -647,33 +708,34 @@ export default function ScanScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.cream,
   },
   demoBadge: {
-    backgroundColor: '#10b981',
-    paddingVertical: 4,
-    paddingHorizontal: 10,
     alignSelf: 'center',
-    borderRadius: 8,
-    marginTop: 8,
+    marginTop: spacing.sm,
+    paddingVertical: spacing.xxs,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.full,
+    backgroundColor: colors.mintSoft,
+    borderWidth: 1,
+    borderColor: colors.primaryLight,
   },
   demoBadgeText: {
-    fontSize: 12,
+    ...typography.caption,
     fontWeight: '600',
-    color: '#ffffff',
+    color: colors.primary,
   },
   thinkingOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.7)',
+    backgroundColor: 'rgba(0,0,0,0.65)',
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 10,
   },
   thinkingText: {
-    marginTop: 16,
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#ffffff',
+    marginTop: spacing.md,
+    ...typography.bodyLargeStrong,
+    color: colors.white,
   },
   loadingContainer: {
     flex: 1,
@@ -681,59 +743,56 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: '#6b7280',
+    marginTop: spacing.sm,
+    ...typography.bodyLarge,
+    color: colors.textSecondary,
   },
   permissionContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 40,
+    paddingHorizontal: spacing.xxl,
   },
   permissionTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#1f2937',
-    marginTop: 16,
-    marginBottom: 8,
+    ...typography.title,
+    color: colors.textPrimary,
+    marginTop: spacing.md,
+    marginBottom: spacing.xs,
     textAlign: 'center',
   },
   permissionText: {
-    fontSize: 14,
-    color: '#6b7280',
+    ...typography.body,
+    color: colors.textSecondary,
     textAlign: 'center',
     lineHeight: 20,
-    marginBottom: 24,
+    marginBottom: spacing.lg,
   },
   permissionButton: {
-    backgroundColor: '#10b981',
-    borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    marginBottom: 12,
+    backgroundColor: colors.primary,
+    borderRadius: radius.md,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.sm,
   },
   permissionButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#ffffff',
+    ...typography.bodyLargeStrong,
+    color: colors.white,
   },
   manualEntryButton: {
     backgroundColor: 'transparent',
-    borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 24,
+    borderRadius: radius.md,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.lg,
     borderWidth: 1,
-    borderColor: '#10b981',
+    borderColor: colors.primary,
   },
   manualEntryButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#10b981',
+    ...typography.bodyLargeStrong,
+    color: colors.primary,
   },
   cameraContainer: {
     flex: 1,
-    backgroundColor: '#000000',
+    backgroundColor: colors.black,
   },
   camera: {
     flex: 1,
@@ -742,56 +801,91 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f9fafb',
+    backgroundColor: colors.cream,
+    paddingHorizontal: spacing.lg,
   },
-  placeholderText: {
-    marginTop: 16,
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1f2937',
+  idleIconWrap: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    backgroundColor: colors.mintSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.md,
   },
-  placeholderSubtext: {
-    marginTop: 8,
-    fontSize: 14,
-    color: '#9ca3af',
+  idleHeadline: {
+    ...typography.subtitle,
+    color: colors.textPrimary,
+    textAlign: 'center',
+  },
+  idleSubcopy: {
+    marginTop: spacing.xs,
+    ...typography.body,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 20,
+    maxWidth: 320,
+  },
+  tipsWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    marginTop: spacing.lg,
+    paddingHorizontal: spacing.xs,
+  },
+  tipChip: {
+    paddingVertical: spacing.xxs + 2,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.full,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+  },
+  tipChipText: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    fontWeight: '500',
   },
   modeToggleContainer: {
     flexDirection: 'row',
-    backgroundColor: '#f3f4f6',
-    borderRadius: 12,
-    padding: 4,
-    marginBottom: 16,
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    padding: spacing.xxs + 2,
+    marginBottom: spacing.md,
   },
   modeButton: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    gap: 6,
+    minHeight: 44,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.md,
+    gap: spacing.xs,
   },
   modeButtonActive: {
-    backgroundColor: '#10b981',
+    backgroundColor: colors.mintSoft,
   },
   modeButtonDisabled: {
     opacity: 0.5,
   },
   modeButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#6b7280',
+    ...typography.bodyStrong,
+    color: colors.textSecondary,
   },
   modeButtonTextActive: {
-    color: '#ffffff',
+    color: colors.primary,
   },
   modeButtonTextDisabled: {
-    color: '#d1d5db',
+    color: colors.iconMuted,
   },
   aiCaptureContainer: {
     position: 'absolute',
-    bottom: 40,
+    bottom: spacing.xxl,
     alignItems: 'center',
     alignSelf: 'center',
   },
@@ -799,52 +893,47 @@ const styles = StyleSheet.create({
     width: 70,
     height: 70,
     borderRadius: 35,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.white,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 4,
-    borderColor: '#10b981',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 5,
+    borderWidth: 3,
+    borderColor: colors.primaryLight,
+    ...shadow.fab,
   },
   captureButtonInner: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#10b981',
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: colors.primary,
   },
   captureButtonDisabled: {
     opacity: 0.5,
   },
   captureHintText: {
-    marginTop: 12,
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '500',
+    marginTop: spacing.sm,
+    color: colors.white,
+    ...typography.bodyStrong,
     textAlign: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.full,
+    maxWidth: width * 0.9,
   },
   analyzingContainer: {
     position: 'absolute',
-    bottom: 40,
+    bottom: spacing.xxl,
     alignItems: 'center',
     alignSelf: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    paddingHorizontal: 24,
-    paddingVertical: 16,
-    borderRadius: 12,
+    backgroundColor: 'rgba(0, 0, 0, 0.72)',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderRadius: radius.md,
   },
   analyzingText: {
-    marginTop: 12,
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '500',
+    marginTop: spacing.sm,
+    color: colors.white,
+    ...typography.bodyStrong,
   },
   scanButtonDisabled: {
     opacity: 0.6,
@@ -855,132 +944,132 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  instructionChipTop: {
+    position: 'absolute',
+    top: 76,
+    left: spacing.md,
+    right: spacing.md,
+    alignItems: 'center',
+    zIndex: 5,
+  },
+  instructionChipText: {
+    ...typography.caption,
+    fontWeight: '600',
+    color: colors.white,
+    textAlign: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.full,
+    overflow: 'hidden',
+  },
   flashlightButton: {
     position: 'absolute',
-    top: 20,
-    left: 20,
+    top: spacing.lg,
+    left: spacing.lg,
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 10,
   },
   scanArea: {
-    width: SCAN_AREA_SIZE,
-    height: SCAN_AREA_SIZE,
+    width: SCAN_FRAME_WIDTH,
+    height: SCAN_FRAME_HEIGHT,
     position: 'relative',
+  },
+  scanLine: {
+    position: 'absolute',
+    left: '12%',
+    right: '12%',
+    top: 0,
+    height: 2,
+    borderRadius: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.38)',
   },
   corner: {
     position: 'absolute',
-    width: 30,
-    height: 30,
-    borderColor: '#10b981',
-    borderWidth: 3,
+    width: 22,
+    height: 22,
+    borderColor: colors.white,
+    borderWidth: 2,
   },
   topLeft: {
     top: 0,
     left: 0,
     borderRightWidth: 0,
     borderBottomWidth: 0,
+    borderTopLeftRadius: radius.sm,
   },
   topRight: {
     top: 0,
     right: 0,
     borderLeftWidth: 0,
     borderBottomWidth: 0,
+    borderTopRightRadius: radius.sm,
   },
   bottomLeft: {
     bottom: 0,
     left: 0,
     borderRightWidth: 0,
     borderTopWidth: 0,
+    borderBottomLeftRadius: radius.sm,
   },
   bottomRight: {
     bottom: 0,
     right: 0,
     borderLeftWidth: 0,
     borderTopWidth: 0,
-  },
-  centerDot: {
-    position: 'absolute',
-    top: '50%',
-    left: '50%',
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#10b981',
-    transform: [{ translateX: -4 }, { translateY: -4 }],
-    zIndex: 2,
-  },
-  crosshair: {
-    position: 'absolute',
-    backgroundColor: '#10b981',
-  },
-  crosshairHorizontal: {
-    top: '50%',
-    left: '20%',
-    width: '60%',
-    height: 2,
-    transform: [{ translateY: -1 }],
-  },
-  crosshairVertical: {
-    left: '50%',
-    top: '20%',
-    height: '60%',
-    width: 2,
-    transform: [{ translateX: -1 }],
+    borderBottomRightRadius: radius.sm,
   },
   scanningIndicator: {
     position: 'absolute',
-    bottom: 40,
+    bottom: spacing.xxl,
     alignSelf: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.full,
+    maxWidth: width * 0.92,
   },
   scanningText: {
-    color: '#ffffff',
-    fontSize: 14,
+    color: colors.white,
+    ...typography.body,
     fontWeight: '500',
+    textAlign: 'center',
   },
   controlsContainer: {
-    paddingHorizontal: 20,
-    paddingVertical: 24,
-    backgroundColor: '#ffffff',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
+    backgroundColor: colors.cream,
   },
   scanButton: {
     flexDirection: 'row',
-    backgroundColor: '#10b981',
-    borderRadius: 12,
-    paddingVertical: 16,
-    paddingHorizontal: 24,
+    backgroundColor: colors.primary,
+    borderRadius: radius.full,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 10,
-    shadowColor: '#10b981',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
+    gap: spacing.sm,
+    ...shadow.fab,
   },
   scanButtonText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#ffffff',
+    ...typography.subtitle,
+    color: colors.white,
   },
   manualEntryLink: {
-    marginTop: 16,
+    marginTop: spacing.md,
     alignItems: 'center',
   },
   manualEntryText: {
-    fontSize: 14,
-    color: '#6b7280',
+    ...typography.body,
+    color: colors.textSecondary,
   },
   manualEntryLinkText: {
-    color: '#10b981',
+    color: colors.link,
     fontWeight: '600',
   },
 });

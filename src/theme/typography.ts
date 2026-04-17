@@ -12,6 +12,8 @@ const scale = {
   title: 20,
   headline: 24,
   display: 22,
+  /** Editorial hero / marketing line */
+  hero: 26,
 } as const;
 
 export const typography = {
@@ -52,6 +54,27 @@ export const typography = {
   headline: {
     fontSize: scale.headline,
     fontWeight: '700' as const,
+  },
+  /** Short beauty-forward line under the logo / in hero */
+  heroTagline: {
+    fontSize: scale.bodyStrong,
+    fontWeight: '500' as const,
+    letterSpacing: 0.2,
+    lineHeight: 22,
+  },
+  /** Main hero headline (K-beauty editorial) */
+  heroTitle: {
+    fontSize: scale.hero,
+    fontWeight: '700' as const,
+    letterSpacing: -0.3,
+    lineHeight: 32,
+  },
+  /** Uppercase section label */
+  sectionLabel: {
+    fontSize: 11,
+    fontWeight: '700' as const,
+    letterSpacing: 1.4,
+    textTransform: 'uppercase' as const,
   },
 } as const satisfies Record<string, TextStyle>;
 

@@ -3,7 +3,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import type { BottomTabBarButtonProps } from '@react-navigation/bottom-tabs';
 import { Animated, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing } from '../theme';
+import { colors, spacing, typography } from '../theme';
 import HomeScreen from '../screens/HomeScreen';
 import ScanScreen from '../screens/ScanScreen';
 import InventoryScreen from '../screens/InventoryScreen';
@@ -89,8 +89,13 @@ export default function TabNavigator() {
         options={{
           headerShown: true,
           headerTitle: 'Scan or add product',
+          headerStyle: {
+            backgroundColor: colors.cream,
+          },
+          headerShadowVisible: false,
           headerTitleStyle: {
-            color: colors.primary,
+            ...typography.title,
+            color: colors.textPrimary,
             fontWeight: '600',
           },
           tabBarIcon: ({ color, size }) => (

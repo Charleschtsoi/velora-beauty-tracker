@@ -18,6 +18,7 @@ export const radius = {
   sm: 8,
   md: 12,
   lg: 16,
+  xl: 24,
   full: 9999,
 } as const;
 
@@ -53,5 +54,13 @@ export const shadow = {
     shadowOpacity: 0.2,
     shadowRadius: 8,
     elevation: 5,
+  },
+  /** Soft glow for hero / editorial cards */
+  heroSoft: {
+    shadowColor,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.07,
+    shadowRadius: 16,
+    elevation: 4,
   },
 } as const;

@@ -22,27 +22,41 @@ interface ProductListItemProps {
   onDelete?: () => void;
   compact?: boolean;
   testID?: string;
-  /** Optional delay in ms for staggered entrance (e.g. index * 40). */
   entranceDelay?: number;
 }
 
-const getStatusConfig = (status: ExpirationStatus, daysUntil: number) => {
+const getStatusColor = (status: ExpirationStatus): string => {
   switch (status) {
     case ExpirationStatus.EXPIRED:
-      return { text: 'Expired', color: colors.statusExpired, bgColor: colors.statusExpiredBg };
+      return colors.statusExpired;
     case ExpirationStatus.EXPIRING_SOON:
-      if (daysUntil === 0) {
-        return { text: 'Expires today', color: colors.statusExpiringSoon, bgColor: colors.statusExpiringSoonBg };
-      }
-      return { text: 'Expiring', color: colors.statusExpiringSoon, bgColor: colors.statusExpiringSoonBg };
+      return colors.statusExpiringSoon;
     case ExpirationStatus.WARNING:
-      return { text: 'Warning', color: colors.statusWarning, bgColor: colors.statusWarningBg };
+      return colors.statusWarning;
     case ExpirationStatus.SAFE:
-      return { text: 'Safe', color: colors.statusSafe, bgColor: colors.statusSafeBg };
+      return colors.statusSafe;
     default:
-      return { text: '—', color: colors.statusMuted, bgColor: colors.statusMutedBg };
+      return colors.statusMuted;
   }
 };
+
+const getStatusTint = (status: ExpirationStatus): string => {
+  switch (status) {
+    case ExpirationStatus.EXPIRED:
+      return colors.statusExpiredBg;
+    case ExpirationStatus.EXPIRING_SOON:
+      return colors.statusExpiringSoonBg;
+    case ExpirationStatus.WARNING:
+      return colors.statusWarningBg;
+    case ExpirationStatus.SAFE:
+      return colors.statusSafeBg;
+    default:
+      return colors.surfaceMuted;
+  }
+};
+
+const IMAGE_SIZE_DEFAULT = 76;
+const IMAGE_SIZE_COMPACT = 44;
 
 export default function ProductListItem({
   product,
@@ -54,8 +68,10 @@ export default function ProductListItem({
 }: ProductListItemProps) {
   const status = getExpirationStatus(product.expirationDate);
   const daysUntil = getDaysUntilExpiration(product.expirationDate);
-  const statusConfig = getStatusConfig(status, daysUntil);
+  const statusColor = getStatusColor(status);
+  const statusTint = getStatusTint(status);
   const categoryLabel = CATEGORY_LABELS[product.category];
+
   const opacity = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(8)).current;
   useEffect(() => {
@@ -68,81 +84,74 @@ export default function ProductListItem({
     return () => clearTimeout(timer);
   }, [entranceDelay, opacity, translateY]);
 
-  const containerStyle = compact ? [styles.container, styles.containerCompact] : styles.container;
-  const imageSize = compact ? 44 : 60;
-  const imageStyle = [styles.image, compact && { width: imageSize, height: imageSize }];
-  const placeholderStyle = [styles.imagePlaceholder, compact && { width: imageSize, height: imageSize }];
+  const imageSize = compact ? IMAGE_SIZE_COMPACT : IMAGE_SIZE_DEFAULT;
+  const imageStyle = [styles.image, { width: imageSize, height: imageSize, borderRadius: compact ? radius.md : radius.lg }];
+  const placeholderStyle = [
+    styles.imagePlaceholder,
+    { width: imageSize, height: imageSize, borderRadius: compact ? radius.md : radius.lg },
+  ];
+
+  const expiryLabel = compact
+    ? daysUntil >= 0
+      ? `${daysUntil}d left`
+      : `${Math.abs(daysUntil)}d ago`
+    : `Expires ${formatDate(product.expirationDate)}`;
 
   return (
     <Animated.View style={{ opacity, transform: [{ translateY }] }}>
-    <TouchableOpacity
-      style={containerStyle}
-      onPress={onPress}
-      activeOpacity={0.72}
-      testID={testID}
-    >
-      {/* Image column */}
-      <View style={[styles.imageColumn, compact && styles.imageColumnCompact]}>
-        <View style={styles.imageContainer}>
+      <TouchableOpacity
+        style={[styles.container, compact && styles.containerCompact]}
+        onPress={onPress}
+        activeOpacity={0.72}
+        testID={testID}
+      >
+        <View style={[styles.imageColumn, { width: imageSize, marginRight: compact ? spacing.sm : spacing.md }]}>
           {product.photoUrl ? (
             <Image source={{ uri: product.photoUrl }} style={imageStyle} />
           ) : (
             <View style={placeholderStyle}>
-              <Ionicons name="cube-outline" size={compact ? 20 : 24} color={colors.primary} />
+              {compact ? (
+                <Ionicons name="cube-outline" size={20} color={colors.primary} />
+              ) : (
+                <Text style={styles.placeholderLetter}>{product.name.charAt(0).toUpperCase()}</Text>
+              )}
             </View>
           )}
         </View>
-      </View>
 
-      {/* Product Info */}
-      <View style={styles.infoContainer} pointerEvents="box-none">
-        <View style={styles.statusRow}>
-          <View style={[styles.statusBadge, { backgroundColor: statusConfig.bgColor }]}>
-            <Text style={[styles.statusText, { color: statusConfig.color }]}>
-              {statusConfig.text}
-            </Text>
-          </View>
-        </View>
-        <View style={styles.titleRow} pointerEvents="box-none">
+        <View style={styles.infoContainer} pointerEvents="box-none">
           <Text style={compact ? styles.productNameCompact : styles.productName} numberOfLines={2}>
             {product.name}
           </Text>
-        </View>
-        <View style={styles.categoryRow}>
+          {!compact && product.brand ? (
+            <Text style={styles.brand} numberOfLines={1}>
+              {product.brand}
+            </Text>
+          ) : null}
           <View style={styles.categoryPill}>
             <Text style={styles.categoryPillText}>{categoryLabel}</Text>
           </View>
+          <View style={[styles.expiryPill, { backgroundColor: statusTint }]}>
+            <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
+            <Text style={styles.expiryText}>{expiryLabel}</Text>
+          </View>
         </View>
-        {!compact && product.brand && (
-          <Text style={styles.brand} numberOfLines={1}>
-            {product.brand}
-          </Text>
-        )}
-        <View style={styles.dateContainer}>
-          <Ionicons name="calendar-outline" size={compact ? 12 : 14} color={colors.textSecondary} />
-          <Text style={compact ? styles.expiryDateCompact : styles.expiryDate}>
-            {compact
-              ? daysUntil >= 0
-                ? `${daysUntil} ${daysUntil === 1 ? 'day' : 'days'} left`
-                : `Expired ${Math.abs(daysUntil)} ${Math.abs(daysUntil) === 1 ? 'day' : 'days'} ago`
-              : `Expires: ${formatDate(product.expirationDate)}`}
-          </Text>
-        </View>
-      </View>
 
-      {onDelete && (
-        <TouchableOpacity
-          style={styles.deleteButton}
-          onPress={(e) => {
-            e.stopPropagation();
-            onDelete();
-          }}
-          testID="delete-button"
-        >
-          <Ionicons name="trash-outline" size={20} color={colors.white} />
-        </TouchableOpacity>
-      )}
-    </TouchableOpacity>
+        {onDelete && (
+          <TouchableOpacity
+            style={styles.deleteButton}
+            onPress={(e) => {
+              e.stopPropagation();
+              onDelete();
+            }}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            testID="delete-button"
+            accessibilityLabel="Remove product"
+          >
+            <Ionicons name="trash-outline" size={compact ? 18 : 20} color={colors.textSecondary} />
+          </TouchableOpacity>
+        )}
+      </TouchableOpacity>
     </Animated.View>
   );
 }
@@ -151,117 +160,98 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     backgroundColor: colors.surface,
-    borderRadius: radius.md,
+    borderRadius: radius.xl,
     padding: spacing.md,
     marginBottom: spacing.sm,
     alignItems: 'center',
-    ...shadow.cardSubtle,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    ...shadow.card,
   },
   containerCompact: {
     padding: spacing.sm,
     marginBottom: spacing.xs,
+    borderRadius: radius.lg,
   },
   imageColumn: {
-    flexDirection: 'column',
     alignItems: 'center',
-    width: 60,
-    marginRight: spacing.sm,
   },
-  imageColumnCompact: {
-    width: 44,
-  },
-  imageContainer: {},
   image: {
-    width: 60,
-    height: 60,
-    borderRadius: radius.sm,
     backgroundColor: colors.surfaceMuted,
   },
   imagePlaceholder: {
-    width: 60,
-    height: 60,
-    borderRadius: radius.sm,
-    backgroundColor: colors.primaryTint,
+    backgroundColor: colors.mintSoft,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  placeholderLetter: {
+    fontSize: 26,
+    fontWeight: '600',
+    color: colors.primary,
   },
   infoContainer: {
     flex: 1,
     justifyContent: 'center',
     minWidth: 0,
   },
-  titleRow: {
-    flexDirection: 'row',
-    minWidth: 0,
-    marginBottom: 2,
-  },
   productName: {
-    flex: 1,
-    minWidth: 0,
     ...typography.bodyLargeStrong,
+    fontSize: 16,
     color: colors.textPrimary,
+    marginBottom: spacing.xxs,
+    letterSpacing: -0.2,
   },
   productNameCompact: {
-    flex: 1,
-    minWidth: 0,
-    fontSize: 14,
-    fontWeight: '600',
+    ...typography.bodyStrong,
     color: colors.textPrimary,
-  },
-  categoryRow: {
-    flexDirection: 'row',
-    marginBottom: 4,
-  },
-  categoryPill: {
-    flexShrink: 0,
-    backgroundColor: colors.surfaceMuted,
-    paddingHorizontal: spacing.xs,
-    paddingVertical: 2,
-    borderRadius: radius.sm,
-  },
-  categoryPillText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: colors.textSecondary,
+    marginBottom: 2,
   },
   brand: {
     ...typography.body,
     color: colors.textSecondary,
-    marginBottom: 6,
+    marginBottom: spacing.xs,
   },
-  dateContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xxs,
-  },
-  expiryDate: {
-    ...typography.caption,
-    color: colors.textSecondary,
-  },
-  expiryDateCompact: {
-    fontSize: 11,
-    color: colors.textSecondary,
-  },
-  statusRow: {
-    flexDirection: 'row',
+  categoryPill: {
     alignSelf: 'flex-start',
-    marginBottom: 4,
-  },
-  statusBadge: {
+    backgroundColor: colors.heroTint,
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xxs,
-    borderRadius: radius.sm,
+    borderRadius: radius.full,
+    marginBottom: spacing.xs,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
   },
-  statusText: {
-    fontSize: 11,
+  categoryPillText: {
+    ...typography.caption,
+    fontWeight: '600',
+    color: colors.textSecondary,
+  },
+  expiryPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    paddingVertical: spacing.xxs,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.full,
+  },
+  statusDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    marginRight: spacing.xs,
+  },
+  expiryText: {
+    ...typography.caption,
     fontWeight: '600',
     color: colors.textPrimary,
   },
   deleteButton: {
-    backgroundColor: colors.destructive,
-    width: 50,
-    height: 50,
-    borderRadius: radius.sm,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.surfaceMuted,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: spacing.sm,

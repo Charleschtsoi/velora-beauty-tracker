@@ -10,6 +10,18 @@ export const colors = {
   secondary: '#e11d48', // soft rose accent for highlights (beauty-adjacent)
   secondaryLight: '#ffe4e6',
 
+  // K-beauty editorial accents (pastel, airy)
+  blush: '#fce7f3',
+  blushDeep: '#f9a8d4',
+  mintSoft: '#ecfdf5',
+  sage: '#a7f3d0',
+  cream: '#fffbf7',
+  peach: '#ffedd5',
+  champagne: '#fef3c7',
+  /** Soft tint for hero / glass-like surfaces */
+  heroTint: '#f0fdf9',
+  heroTint2: '#fdf2f8',
+
   // Surfaces (warm editorial)
   background: '#faf9f7', // warm off-white default
   backgroundWarm: '#fafaf9',

@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, TextInput, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing, radius, typography } from '../../theme';
+import { colors, spacing, radius, shadow, typography } from '../../theme';
 
 interface SearchBarProps {
   value: string;
@@ -11,6 +11,10 @@ interface SearchBarProps {
   onSortPress?: () => void;
   /** When set, show a single "Filter & sort" button instead of separate filter/sort icons. */
   filterSortLabel?: string;
+  /** Editorial card style for inventory / cream shells */
+  variant?: 'default' | 'editorial';
+  /** When false, parent controls vertical spacing below the bar */
+  bottomSpacing?: boolean;
   testID?: string;
 }
 
@@ -21,14 +25,24 @@ export default function SearchBar({
   onFilterPress,
   onSortPress,
   filterSortLabel,
+  variant = 'default',
+  bottomSpacing = true,
   testID,
 }: SearchBarProps) {
   const openFilterSort = onFilterPress ?? onSortPress;
   const showSingleFilterSort = filterSortLabel && openFilterSort;
+  const editorial = variant === 'editorial';
 
   return (
-    <View style={styles.container} testID={testID}>
-      <View style={styles.searchInputContainer}>
+    <View
+      style={[
+        styles.container,
+        editorial && styles.containerEditorial,
+        !bottomSpacing && styles.containerNoBottomMargin,
+      ]}
+      testID={testID}
+    >
+      <View style={[styles.searchInputContainer, editorial && styles.searchInputContainerEditorial]}>
         <Ionicons name="search" size={20} color={colors.textTertiary} style={styles.searchIcon} />
         <TextInput
           style={styles.searchInput}
@@ -50,7 +64,7 @@ export default function SearchBar({
       </View>
       {showSingleFilterSort ? (
         <TouchableOpacity
-          style={styles.filterSortButton}
+          style={[styles.filterSortButton, editorial && styles.filterSortButtonEditorial]}
           onPress={openFilterSort}
           testID="filter-sort-button"
         >
@@ -61,7 +75,7 @@ export default function SearchBar({
         <>
           {onFilterPress && (
             <TouchableOpacity
-              style={styles.actionButton}
+              style={[styles.actionButton, editorial && styles.actionButtonEditorial]}
               onPress={onFilterPress}
               testID="filter-button"
             >
@@ -70,7 +84,7 @@ export default function SearchBar({
           )}
           {onSortPress && (
             <TouchableOpacity
-              style={styles.actionButton}
+              style={[styles.actionButton, editorial && styles.actionButtonEditorial]}
               onPress={onSortPress}
               testID="sort-button"
             >
@@ -90,6 +104,12 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
     marginBottom: spacing.md,
   },
+  containerNoBottomMargin: {
+    marginBottom: 0,
+  },
+  containerEditorial: {
+    gap: spacing.sm,
+  },
   searchInputContainer: {
     flex: 1,
     flexDirection: 'row',
@@ -98,6 +118,13 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     paddingHorizontal: spacing.sm,
     minHeight: 44,
+  },
+  searchInputContainerEditorial: {
+    backgroundColor: colors.heroTint,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    borderRadius: radius.lg,
+    ...shadow.cardSubtle,
   },
   searchIcon: {
     marginRight: spacing.xs,
@@ -120,6 +147,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  actionButtonEditorial: {
+    backgroundColor: colors.mintSoft,
+    borderWidth: 1,
+    borderColor: colors.primaryLight,
+  },
   filterSortButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -128,6 +160,12 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     backgroundColor: colors.primaryTint,
     minWidth: 44,
+  },
+  filterSortButtonEditorial: {
+    backgroundColor: colors.mintSoft,
+    borderWidth: 1,
+    borderColor: colors.primaryLight,
+    borderRadius: radius.full,
   },
   filterSortIcon: {
     marginRight: 6,

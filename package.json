@@ -4,7 +4,8 @@
   "main": "expo/AppEntry.js",
   "scripts": {
     "start": "node scripts/expo-connection-diagnostic.js && expo start",
-    "start:tunnel": "node scripts/expo-connection-diagnostic.js tunnel && expo start --tunnel",
+    "start:tunnel": "node scripts/start-tunnel-strict.js",
+    "start:tunnel:strict": "node scripts/start-tunnel-strict.js",
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web"
