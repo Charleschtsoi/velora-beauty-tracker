@@ -16,6 +16,7 @@ import { getExpirationStatus } from '../utils/dateHelpers';
 import { ExpirationStatus } from '../types/product.types';
 import ProductCard from '../components/products/ProductCard';
 import EmptyState from '../components/common/EmptyState';
+import { typography } from '../theme';
 
 const categoryConfig: Record<ProductCategory, { label: string; icon: keyof typeof Ionicons.glyphMap; color: string }> = {
   [ProductCategory.SKINCARE]: {
@@ -267,8 +268,8 @@ const styles = StyleSheet.create({
     marginLeft: -8,
   },
   headerTitle: {
-    fontSize: 20,
-    fontWeight: '600',
+    ...typography.screenHeader,
+    fontSize: 26,
     color: '#1f2937',
     flex: 1,
     textAlign: 'center',
@@ -362,8 +363,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   sectionTitle: {
+    ...typography.cardTitle,
     fontSize: 18,
-    fontWeight: '600',
     color: '#1f2937',
     flex: 1,
   },

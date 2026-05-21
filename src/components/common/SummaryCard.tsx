@@ -196,7 +196,7 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   titleGrid: {
-    fontSize: 11,
+    ...typography.caption,
     fontWeight: '600',
     color: colors.textSecondary,
     textAlign: 'center',

@@ -1,6 +1,7 @@
 import React from 'react';
 import { TouchableOpacity, Text, StyleSheet, ActivityIndicator, ViewStyle, TextStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { colors, typography } from '../../theme';
 
 interface ButtonProps {
   title: string;
@@ -33,33 +34,33 @@ export default function Button({
     switch (variant) {
       case 'primary':
         return {
-          backgroundColor: disabled ? '#d1d5db' : '#10b981',
-          borderColor: disabled ? '#d1d5db' : '#10b981',
-          textColor: '#ffffff',
+          backgroundColor: disabled ? colors.iconMuted : colors.primary,
+          borderColor: disabled ? colors.iconMuted : colors.primary,
+          textColor: colors.white,
         };
       case 'secondary':
         return {
-          backgroundColor: disabled ? '#f3f4f6' : '#6b7280',
-          borderColor: disabled ? '#f3f4f6' : '#6b7280',
-          textColor: '#ffffff',
+          backgroundColor: disabled ? colors.surfaceMuted : colors.textSecondary,
+          borderColor: disabled ? colors.surfaceMuted : colors.textSecondary,
+          textColor: colors.white,
         };
       case 'outline':
         return {
           backgroundColor: 'transparent',
-          borderColor: disabled ? '#d1d5db' : '#10b981',
-          textColor: disabled ? '#d1d5db' : '#10b981',
+          borderColor: disabled ? colors.iconMuted : colors.primary,
+          textColor: disabled ? colors.iconMuted : colors.primary,
         };
       case 'danger':
         return {
-          backgroundColor: disabled ? '#fee2e2' : '#ef4444',
-          borderColor: disabled ? '#fee2e2' : '#ef4444',
-          textColor: '#ffffff',
+          backgroundColor: disabled ? colors.statusExpiredBg : colors.destructive,
+          borderColor: disabled ? colors.statusExpiredBg : colors.destructive,
+          textColor: colors.white,
         };
       default:
         return {
-          backgroundColor: '#10b981',
-          borderColor: '#10b981',
-          textColor: '#ffffff',
+          backgroundColor: colors.primary,
+          borderColor: colors.primary,
+          textColor: colors.white,
         };
     }
   };
@@ -67,13 +68,13 @@ export default function Button({
   const getSizeStyles = () => {
     switch (size) {
       case 'small':
-        return { paddingVertical: 8, paddingHorizontal: 16, fontSize: 14, iconSize: 16 };
+        return { paddingVertical: 8, paddingHorizontal: 16, iconSize: 16 };
       case 'medium':
-        return { paddingVertical: 12, paddingHorizontal: 20, fontSize: 16, iconSize: 20 };
+        return { paddingVertical: 12, paddingHorizontal: 20, iconSize: 20 };
       case 'large':
-        return { paddingVertical: 16, paddingHorizontal: 24, fontSize: 18, iconSize: 24 };
+        return { paddingVertical: 16, paddingHorizontal: 24, iconSize: 24 };
       default:
-        return { paddingVertical: 12, paddingHorizontal: 20, fontSize: 16, iconSize: 20 };
+        return { paddingVertical: 12, paddingHorizontal: 20, iconSize: 20 };
     }
   };
 
@@ -112,10 +113,7 @@ export default function Button({
           <Text
             style={[
               styles.text,
-              {
-                color: variantStyles.textColor,
-                fontSize: sizeStyles.fontSize,
-              },
+              { color: variantStyles.textColor },
               textStyle,
             ]}
           >
@@ -145,7 +143,7 @@ const styles = StyleSheet.create({
     minHeight: 44,
   },
   text: {
-    fontWeight: '600',
+    ...typography.bodyStrong,
     textAlign: 'center',
   },
   iconLeft: {

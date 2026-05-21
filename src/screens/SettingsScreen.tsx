@@ -17,6 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as settingsStorage from '../services/settingsStorage';
+import { colors, typography } from '../theme';
 
 interface SettingsSectionProps {
   title: string;
@@ -449,9 +450,9 @@ const styles = StyleSheet.create({
     height: 44,
   },
   headerTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#1f2937',
+    ...typography.screenHeader,
+    fontSize: 26,
+    color: colors.textPrimary,
     flex: 1,
     textAlign: 'center',
   },
@@ -466,11 +467,9 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
   },
   sectionTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#6b7280',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    ...typography.editorialLabel,
+    fontSize: 11,
+    color: colors.textTertiary,
     marginBottom: 8,
     marginLeft: 4,
   },

@@ -21,6 +21,7 @@ import { showToast } from '../utils/toast';
 import type { AIFieldMap, AIFieldKey } from '../services/aiService';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { onProductSaved } from '../services/localNotificationService';
+import { typography } from '../theme';
 
 type AddProductRouteProp = RouteProp<RootStackParamList, 'AddProduct'>;
 
@@ -554,8 +555,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
+    ...typography.modalHeader,
     color: '#1f2937',
   },
   scrollView: {

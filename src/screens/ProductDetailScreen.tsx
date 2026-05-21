@@ -22,7 +22,7 @@ import DatePickerField from '../components/common/DatePickerField';
 import DropdownSelect from '../components/common/DropdownSelect';
 import { showToast } from '../utils/toast';
 import { onProductUpdated, cancelExpiryReminder, cancelPAOReminder } from '../services/localNotificationService';
-import { colors } from '../theme';
+import { colors, typography } from '../theme';
 
 // Navigation types
 type RootStackParamList = {
@@ -610,8 +610,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
+    ...typography.modalHeader,
     color: '#1f2937',
   },
   headerRight: {

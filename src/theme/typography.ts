@@ -1,13 +1,8 @@
 /**
- * Design tokens: type scale and text styles.
- * Serif for logo and major headers; sans for body and metadata.
+ * Global typography: Cormorant Garamond (display) + system sans (functional UI).
  */
-import { Platform, TextStyle } from 'react-native';
-
-export const fontFamilies = {
-  serif: Platform.select({ ios: 'Georgia', android: 'serif', default: 'serif' }),
-  sans: Platform.select({ ios: 'System', android: 'sans-serif', default: 'System' }),
-} as const;
+import { TextStyle } from 'react-native';
+import { fontFamily, brandLogoSize } from './fonts';
 
 const scale = {
   caption: 12,
@@ -16,93 +11,128 @@ const scale = {
   subtitle: 18,
   title: 20,
   headline: 24,
-  display: 22,
-  hero: 26,
+  screenHeader: 28,
+  modalHeader: 22,
+  emptyState: 24,
+  brandLogo: brandLogoSize,
+} as const;
+
+const displayBase: TextStyle = {
+  fontFamily: fontFamily.display,
+  fontWeight: '400',
+};
+
+const sansBase = (weight: TextStyle['fontWeight'] = '400'): TextStyle => ({
+  fontFamily: fontFamily.sans,
+  fontWeight: weight,
+});
+
+export const fontFamilies = {
+  display: fontFamily.display,
+  sans: fontFamily.sans,
 } as const;
 
 export const typography = {
-  display: {
-    fontFamily: fontFamilies.serif,
-    fontSize: scale.display,
-    fontWeight: '700' as const,
-    letterSpacing: 1.4,
+  /** Home wordmark only */
+  brandLogo: {
+    ...displayBase,
+    fontSize: scale.brandLogo,
+    letterSpacing: 1.5,
   },
-  caption: {
-    fontFamily: fontFamilies.sans,
-    fontSize: scale.caption,
-    fontWeight: '400' as const,
+  /** Top-level tab screen titles: Inventory, Reminders, Settings */
+  screenHeader: {
+    ...displayBase,
+    fontSize: scale.screenHeader,
+    letterSpacing: 0.5,
+    lineHeight: 34,
   },
-  body: {
-    fontFamily: fontFamilies.sans,
-    fontSize: scale.body,
-    fontWeight: '400' as const,
+  /** Modal / stack sheet titles: Add Product, Product Detail */
+  modalHeader: {
+    ...displayBase,
+    fontSize: scale.modalHeader,
+    letterSpacing: 0.3,
+    lineHeight: 28,
   },
-  bodyStrong: {
-    fontFamily: fontFamilies.sans,
-    fontSize: scale.body,
-    fontWeight: '600' as const,
-  },
-  bodyLarge: {
-    fontFamily: fontFamilies.sans,
-    fontSize: scale.bodyStrong,
-    fontWeight: '400' as const,
-  },
-  bodyLargeStrong: {
-    fontFamily: fontFamilies.sans,
-    fontSize: scale.bodyStrong,
-    fontWeight: '600' as const,
-  },
-  subtitle: {
-    fontFamily: fontFamilies.sans,
-    fontSize: scale.subtitle,
-    fontWeight: '600' as const,
-  },
-  title: {
-    fontFamily: fontFamilies.serif,
-    fontSize: scale.title,
-    fontWeight: '600' as const,
-  },
-  headline: {
-    fontFamily: fontFamilies.serif,
-    fontSize: scale.headline,
-    fontWeight: '700' as const,
-  },
-  heroTagline: {
-    fontFamily: fontFamilies.sans,
-    fontSize: scale.bodyStrong,
-    fontWeight: '500' as const,
+  /** Empty state headline */
+  emptyStateTitle: {
+    ...displayBase,
+    fontSize: scale.emptyState,
     letterSpacing: 0.2,
-    lineHeight: 22,
+    lineHeight: 30,
   },
-  heroTitle: {
-    fontFamily: fontFamilies.serif,
-    fontSize: scale.hero,
-    fontWeight: '600' as const,
-    letterSpacing: -0.3,
-    lineHeight: 32,
+  /** Legacy alias — Cormorant display at logo scale */
+  display: {
+    ...displayBase,
+    fontSize: scale.brandLogo,
+    letterSpacing: 1.5,
   },
-  /** Small uppercase sans editorial labels (section eyebrows). */
-  editorialLabel: {
-    fontFamily: fontFamilies.sans,
-    fontSize: 10,
-    fontWeight: '600' as const,
-    letterSpacing: 2,
-    textTransform: 'uppercase' as const,
+  /** Legacy alias — same as screenHeader */
+  headline: {
+    ...displayBase,
+    fontSize: scale.screenHeader,
+    letterSpacing: 0.5,
+    lineHeight: 34,
   },
-  /** Card and in-content headings — sans only. */
-  cardTitle: {
-    fontFamily: fontFamilies.sans,
+  /** Legacy alias — sans card/list heading (was serif) */
+  title: {
+    ...sansBase('600'),
     fontSize: scale.title,
-    fontWeight: '600' as const,
     letterSpacing: -0.15,
     lineHeight: 26,
   },
-  sectionLabel: {
-    fontFamily: fontFamilies.sans,
+  heroTitle: {
+    ...displayBase,
+    fontSize: 26,
+    letterSpacing: -0.3,
+    lineHeight: 32,
+  },
+  heroTagline: {
+    ...sansBase('500'),
+    fontSize: scale.bodyStrong,
+    letterSpacing: 0.2,
+    lineHeight: 22,
+  },
+  caption: {
+    ...sansBase('400'),
+    fontSize: scale.caption,
+  },
+  body: {
+    ...sansBase('400'),
+    fontSize: scale.body,
+  },
+  bodyStrong: {
+    ...sansBase('600'),
+    fontSize: scale.body,
+  },
+  bodyLarge: {
+    ...sansBase('400'),
+    fontSize: scale.bodyStrong,
+  },
+  bodyLargeStrong: {
+    ...sansBase('600'),
+    fontSize: scale.bodyStrong,
+  },
+  subtitle: {
+    ...sansBase('600'),
+    fontSize: scale.subtitle,
+  },
+  cardTitle: {
+    ...sansBase('600'),
+    fontSize: scale.title,
+    letterSpacing: -0.15,
+    lineHeight: 26,
+  },
+  editorialLabel: {
+    ...sansBase('600'),
     fontSize: 10,
-    fontWeight: '600' as const,
     letterSpacing: 2,
-    textTransform: 'uppercase' as const,
+    textTransform: 'uppercase',
+  },
+  sectionLabel: {
+    ...sansBase('600'),
+    fontSize: 10,
+    letterSpacing: 2,
+    textTransform: 'uppercase',
   },
 } as const satisfies Record<string, TextStyle>;
 

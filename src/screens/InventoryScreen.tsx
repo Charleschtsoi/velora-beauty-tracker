@@ -323,7 +323,7 @@ export default function InventoryScreen() {
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
         <View style={styles.topBar}>
-          <Text style={styles.logo}>Velora</Text>
+          <Text style={styles.screenTitle}>Inventory</Text>
           <View style={{ width: 40 }} />
         </View>
         <View style={styles.skeletonContainer}>
@@ -339,7 +339,7 @@ export default function InventoryScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.topBar}>
-        <Text style={styles.logo}>Velora</Text>
+        <Text style={styles.screenTitle}>Inventory</Text>
         <TouchableOpacity
           style={styles.categoriesIconButton}
           onPress={() => navigation.getParent()?.navigate('Categories' as never)}
@@ -446,8 +446,8 @@ const styles = StyleSheet.create({
     paddingTop: spacing.sm,
     paddingBottom: spacing.md,
   },
-  logo: {
-    ...typography.display,
+  screenTitle: {
+    ...typography.screenHeader,
     color: colors.primary,
   },
   categoriesIconButton: {
@@ -515,9 +515,8 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xxs,
   },
   sectionTitle: {
-    ...typography.title,
+    ...typography.cardTitle,
     color: colors.textPrimary,
-    letterSpacing: -0.2,
     marginBottom: spacing.sm,
   },
   listContainer: {

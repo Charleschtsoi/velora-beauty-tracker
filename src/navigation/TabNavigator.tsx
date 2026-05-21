@@ -3,7 +3,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import type { BottomTabBarButtonProps } from '@react-navigation/bottom-tabs';
 import { Animated, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing, TAB_BAR_HEIGHT } from '../theme';
+import { colors, spacing, TAB_BAR_HEIGHT, tabBarLabelStyle } from '../theme';
 import HomeScreen from '../screens/HomeScreen';
 import InventoryScreen from '../screens/InventoryScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
@@ -53,8 +53,7 @@ export default function TabNavigator() {
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textTertiary,
         tabBarLabelStyle: {
-          fontSize: 11,
-          fontWeight: '500',
+          ...tabBarLabelStyle,
           marginBottom: 2,
         },
         tabBarStyle: {
@@ -70,9 +69,6 @@ export default function TabNavigator() {
           backgroundColor: colors.surface,
         },
         headerTintColor: colors.textPrimary,
-        headerTitleStyle: {
-          fontWeight: '600',
-        },
         tabBarButton: (props) => <AnimatedTabButton {...props} />,
       }}
     >

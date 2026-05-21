@@ -224,7 +224,7 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   title: {
-    ...typography.title,
+    ...typography.subtitle,
     color: colors.textPrimary,
   },
   tabs: {

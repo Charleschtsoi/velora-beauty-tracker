@@ -455,7 +455,7 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xs,
   },
   logo: {
-    ...typography.display,
+    ...typography.brandLogo,
     color: colors.primary,
   },
   settingsButton: {
@@ -617,7 +617,7 @@ const styles = StyleSheet.create({
     ...shadow.heroSoft,
   },
   firstRunTitle: {
-    ...typography.cardTitle,
+    ...typography.modalHeader,
     color: colors.textPrimary,
     marginBottom: spacing.xs,
     textAlign: 'center',

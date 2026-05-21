@@ -7,6 +7,7 @@ import CategoriesScreen from '../screens/CategoriesScreen';
 import ScanScreen from '../screens/ScanScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import type { AIFieldMap, AIFieldKey } from '../services/aiService';
+import { stackHeaderTitleStyle, stackHeaderStyle } from '../theme';
 
 export type RootStackParamList = {
   MainTabs: undefined;
@@ -47,6 +48,9 @@ export default function AppNavigator() {
           headerShown: true,
           headerTitle: 'Scan or add product',
           headerShadowVisible: false,
+          headerStyle: stackHeaderStyle,
+          headerTitleStyle: stackHeaderTitleStyle,
+          headerTintColor: stackHeaderTitleStyle.color,
         }}
       />
       <Stack.Screen

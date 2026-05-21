@@ -146,7 +146,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xl,
   },
   title: {
-    ...typography.title,
+    ...typography.screenHeader,
     color: colors.textPrimary,
     textAlign: 'center',
     marginBottom: spacing.sm,

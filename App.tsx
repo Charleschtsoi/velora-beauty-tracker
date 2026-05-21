@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
+import { useFonts, CormorantGaramond_400Regular } from '@expo-google-fonts/cormorant-garamond';
 import * as Notifications from 'expo-notifications';
 import { ProductProvider } from './src/context/ProductContext';
 import AppNavigator from './src/navigation/AppNavigator';
@@ -30,6 +31,10 @@ Notifications.setNotificationHandler({
 });
 
 export default function App() {
+  const [fontsLoaded] = useFonts({
+    CormorantGaramond_400Regular,
+  });
+
   const [hasSeenWelcome, setHasSeenWelcome] = useState<boolean | null>(null);
   /** In demo mode, welcome is shown every launch; this tracks "dismissed this session" so we can show main app after Get started. */
   const [demoWelcomeDismissed, setDemoWelcomeDismissed] = useState(false);
@@ -74,10 +79,10 @@ export default function App() {
     setTimeout(() => navigateToProduct(productId), 300);
   }, [appReady, lastNotificationResponse]);
 
-  if (hasSeenWelcome === null) {
+  if (!fontsLoaded || hasSeenWelcome === null) {
     return (
       <View style={styles.loadingRoot}>
-        <ActivityIndicator size="large" color="#10b981" />
+        <ActivityIndicator size="large" color="#1A1A1A" />
       </View>
     );
   }

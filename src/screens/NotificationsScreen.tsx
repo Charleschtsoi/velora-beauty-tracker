@@ -262,7 +262,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   headerTitle: {
-    ...typography.title,
+    ...typography.screenHeader,
     color: colors.textPrimary,
   },
   badge: {

@@ -15,8 +15,7 @@ interface EmptyStateProps {
 }
 
 /**
- * Shared empty state: icon, one-line benefit copy, optional CTA.
- * Uses theme tokens for consistent look across Home, Inventory, Reminders, Categories.
+ * Shared empty state: icon, display headline, sans body, optional CTA.
  */
 export default function EmptyState({
   icon = 'cube-outline',
@@ -63,10 +62,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   title: {
-    ...typography.title,
+    ...typography.emptyStateTitle,
     color: colors.textPrimary,
     marginTop: spacing.md,
     marginBottom: spacing.xs,
+    textAlign: 'center',
   },
   subtitle: {
     ...typography.body,
@@ -80,6 +80,8 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.lg,
+    minHeight: 44,
+    justifyContent: 'center',
   },
   buttonText: {
     ...typography.bodyLargeStrong,
