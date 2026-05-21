@@ -1,8 +1,13 @@
 /**
  * Design tokens: type scale and text styles.
- * Roles: caption, body, bodyStrong, subtitle, title, headline, display (logo).
+ * Serif for logo and major headers; sans for body and metadata.
  */
-import { TextStyle } from 'react-native';
+import { Platform, TextStyle } from 'react-native';
+
+export const fontFamilies = {
+  serif: Platform.select({ ios: 'Georgia', android: 'serif', default: 'serif' }),
+  sans: Platform.select({ ios: 'System', android: 'sans-serif', default: 'System' }),
+} as const;
 
 const scale = {
   caption: 12,
@@ -12,68 +17,91 @@ const scale = {
   title: 20,
   headline: 24,
   display: 22,
-  /** Editorial hero / marketing line */
   hero: 26,
 } as const;
 
 export const typography = {
-  /** For app logo / brand wordmark; premium, editorial feel. */
   display: {
+    fontFamily: fontFamilies.serif,
     fontSize: scale.display,
     fontWeight: '700' as const,
-    letterSpacing: 1.2,
+    letterSpacing: 1.4,
   },
   caption: {
+    fontFamily: fontFamilies.sans,
     fontSize: scale.caption,
     fontWeight: '400' as const,
   },
   body: {
+    fontFamily: fontFamilies.sans,
     fontSize: scale.body,
     fontWeight: '400' as const,
   },
   bodyStrong: {
+    fontFamily: fontFamilies.sans,
     fontSize: scale.body,
     fontWeight: '600' as const,
   },
   bodyLarge: {
+    fontFamily: fontFamilies.sans,
     fontSize: scale.bodyStrong,
     fontWeight: '400' as const,
   },
   bodyLargeStrong: {
+    fontFamily: fontFamilies.sans,
     fontSize: scale.bodyStrong,
     fontWeight: '600' as const,
   },
   subtitle: {
+    fontFamily: fontFamilies.sans,
     fontSize: scale.subtitle,
     fontWeight: '600' as const,
   },
   title: {
+    fontFamily: fontFamilies.serif,
     fontSize: scale.title,
     fontWeight: '600' as const,
   },
   headline: {
+    fontFamily: fontFamilies.serif,
     fontSize: scale.headline,
     fontWeight: '700' as const,
   },
-  /** Short beauty-forward line under the logo / in hero */
   heroTagline: {
+    fontFamily: fontFamilies.sans,
     fontSize: scale.bodyStrong,
     fontWeight: '500' as const,
     letterSpacing: 0.2,
     lineHeight: 22,
   },
-  /** Main hero headline (K-beauty editorial) */
   heroTitle: {
+    fontFamily: fontFamilies.serif,
     fontSize: scale.hero,
-    fontWeight: '700' as const,
+    fontWeight: '600' as const,
     letterSpacing: -0.3,
     lineHeight: 32,
   },
-  /** Uppercase section label */
+  /** Small uppercase sans editorial labels (section eyebrows). */
+  editorialLabel: {
+    fontFamily: fontFamilies.sans,
+    fontSize: 10,
+    fontWeight: '600' as const,
+    letterSpacing: 2,
+    textTransform: 'uppercase' as const,
+  },
+  /** Card and in-content headings — sans only. */
+  cardTitle: {
+    fontFamily: fontFamilies.sans,
+    fontSize: scale.title,
+    fontWeight: '600' as const,
+    letterSpacing: -0.15,
+    lineHeight: 26,
+  },
   sectionLabel: {
-    fontSize: 11,
-    fontWeight: '700' as const,
-    letterSpacing: 1.4,
+    fontFamily: fontFamilies.sans,
+    fontSize: 10,
+    fontWeight: '600' as const,
+    letterSpacing: 2,
     textTransform: 'uppercase' as const,
   },
 } as const satisfies Record<string, TextStyle>;

@@ -11,6 +11,9 @@ export const spacing = {
   xxl: 40,
 } as const;
 
+/** Bottom tab bar height — keep in sync with TabNavigator tabBarStyle.height */
+export const TAB_BAR_HEIGHT = 60;
+
 /**
  * Card and container radii.
  */

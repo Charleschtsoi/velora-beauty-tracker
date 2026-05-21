@@ -20,9 +20,13 @@ import ProductCard from '../components/products/ProductCard';
 import { useNavigation } from '@react-navigation/native';
 import { SkeletonCard } from '../components/common/SkeletonLoader';
 import EmptyState from '../components/common/EmptyState';
-import { colors, spacing, radius, shadow, typography } from '../theme';
+import { colors, spacing, radius, shadow, typography, TAB_BAR_HEIGHT } from '../theme';
 import * as settingsStorage from '../services/settingsStorage';
 import { HOME_HERO_IMAGE } from '../assets/homeHeroImage';
+
+const HERO_MIN_HEIGHT = 232;
+/** Clear fixed tab bar + safe breathing room when scrolling last sections */
+const SCROLL_BOTTOM_PADDING = TAB_BAR_HEIGHT + spacing.xxl + spacing.lg;
 
 function getGreeting() {
   const hour = new Date().getHours();
@@ -31,53 +35,41 @@ function getGreeting() {
   return 'Good evening';
 }
 
-function ScanButtonWithPressFeedback({ onPress }: { onPress: () => void }) {
+function HeroBanner({ onPress, translateY }: { onPress: () => void; translateY: Animated.Value }) {
   const scale = useRef(new Animated.Value(1)).current;
-  return (
-    <Pressable
-      onPress={onPress}
-      onPressIn={() => Animated.timing(scale, { toValue: 0.98, duration: 80, useNativeDriver: true }).start()}
-      onPressOut={() => Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 200 }).start()}
-    >
-      <Animated.View style={[styles.scanButton, { transform: [{ scale }] }]}>
-        <Ionicons name="camera" size={22} color={colors.white} />
-        <Text style={styles.scanButtonText}>Scan a product</Text>
-      </Animated.View>
-    </Pressable>
-  );
-}
 
-function QuickAction({
-  icon,
-  label,
-  onPress,
-  testID,
-}: {
-  icon: keyof typeof Ionicons.glyphMap;
-  label: string;
-  onPress: () => void;
-  testID?: string;
-}) {
-  const scale = useRef(new Animated.Value(1)).current;
   return (
-    <Pressable
-      onPress={onPress}
-      testID={testID}
-      style={styles.quickActionPressable}
-      onPressIn={() => Animated.timing(scale, { toValue: 0.97, duration: 80, useNativeDriver: true }).start()}
-      onPressOut={() => Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 200 }).start()}
+    <Animated.View
+      style={[
+        styles.heroWrap,
+        {
+          transform: [{ translateY }],
+        },
+      ]}
     >
-      <Animated.View style={[styles.quickAction, { transform: [{ scale }] }]}>
-        <View style={styles.quickActionIconWrap}>
-          <Ionicons name={icon} size={22} color={colors.primary} />
-        </View>
-        <View style={styles.quickActionLabelWrap}>
-          <Text style={styles.quickActionLabel} numberOfLines={2}>
-            {label}
-          </Text>
-        </View>
-      </Animated.View>
-    </Pressable>
+      <Pressable
+        onPress={onPress}
+        onPressIn={() => Animated.timing(scale, { toValue: 0.98, duration: 80, useNativeDriver: true }).start()}
+        onPressOut={() => Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 200 }).start()}
+        testID="hero-banner-press"
+        accessibilityRole="button"
+        accessibilityLabel="Tap to add to collection"
+      >
+        <Animated.View style={[styles.heroCardAnimated, { transform: [{ scale }] }]}>
+          <View style={styles.heroCard}>
+            <Image source={HOME_HERO_IMAGE} style={styles.heroImage} resizeMode="cover" />
+            <View style={styles.heroOverlay} pointerEvents="none">
+              <View style={styles.heroOverlayContent}>
+                <View style={styles.heroIconRing}>
+                  <Ionicons name="add" size={22} color={colors.white} />
+                </View>
+                <Text style={styles.heroOverlayText}>Tap to add to collection</Text>
+              </View>
+            </View>
+          </View>
+        </Animated.View>
+      </Pressable>
+    </Animated.View>
   );
 }
 
@@ -155,7 +147,6 @@ export default function HomeScreen() {
   const [hasSeenFirstRun, setHasSeenFirstRunState] = useState<boolean | null>(null);
   const [firstRunVisible, setFirstRunVisible] = useState(false);
 
-  /** Keep hero at full opacity — fading the whole card (with overflow + Image) can blank the image after reload on some devices. */
   const heroTranslate = useRef(new Animated.Value(10)).current;
 
   useEffect(() => {
@@ -187,7 +178,7 @@ export default function HomeScreen() {
 
   const handleFirstRunScan = () => {
     dismissFirstRun();
-    navigation.navigate('Scan');
+    navigation.getParent()?.navigate('Scan' as never);
   };
 
   const handleFirstRunAdd = () => {
@@ -211,7 +202,9 @@ export default function HomeScreen() {
   const expiringSoonProducts = useMemo(() => {
     return [...products].sort((a, b) => a.expirationDate.getTime() - b.expirationDate.getTime()).slice(0, 3);
   }, [products]);
+
   const greeting = useMemo(() => getGreeting(), []);
+
   const reminderTone = useMemo(() => {
     if (stats.expiringSoon > 0) {
       return {
@@ -236,6 +229,7 @@ export default function HomeScreen() {
       subtitle: 'Nothing urgent right now, so you can simply enjoy what is already in your routine.',
     };
   }, [stats.expired, stats.expiringSoon]);
+
   const priorityFilter = useMemo<'expiring_soon' | 'expired' | 'all'>(() => {
     if (stats.expiringSoon > 0) return 'expiring_soon';
     if (stats.expired > 0) return 'expired';
@@ -251,7 +245,11 @@ export default function HomeScreen() {
   };
 
   const handleScanPress = () => {
-    navigation.navigate('Scan');
+    navigation.getParent()?.navigate('Scan' as never);
+  };
+
+  const handleSettingsPress = () => {
+    navigation.getParent()?.navigate('Settings' as never);
   };
 
   if (loading && products.length === 0) {
@@ -263,26 +261,17 @@ export default function HomeScreen() {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.topBar}>
-            <View style={[styles.skeletonBlock, { width: 100, height: 22 }]} />
-            <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-              <View style={[styles.skeletonBlock, { width: 36, height: 36, borderRadius: 18 }]} />
-              <View style={[styles.skeletonBlock, { width: 36, height: 36, borderRadius: 18 }]} />
-            </View>
+            <View style={[styles.skeletonBlock, { width: 88, height: 24 }]} />
+            <View style={[styles.skeletonBlock, { width: 44, height: 44, borderRadius: 22 }]} />
           </View>
-          <View style={[styles.heroCard, { overflow: 'hidden' }]}>
-            <View style={[styles.skeletonBlock, { height: 228, borderRadius: 0, marginHorizontal: -1 }]} />
-            <View style={{ padding: spacing.lg }}>
-              <View style={[styles.skeletonBlock, { width: '60%', height: 14, marginBottom: spacing.sm }]} />
-              <View style={[styles.skeletonBlock, { width: '85%', height: 22, marginBottom: spacing.xs }]} />
-              <View style={[styles.skeletonBlock, { width: '50%', height: 12 }]} />
-            </View>
+          <View style={styles.greetingRow}>
+            <View style={[styles.skeletonBlock, { width: 140, height: 16 }]} />
           </View>
-          <View style={styles.quickActionsRow}>
-            {[1, 2, 3].map((k) => (
-              <View key={k} style={styles.quickActionPressable}>
-                <View style={[styles.quickAction, { opacity: 0.35 }]} />
-              </View>
-            ))}
+          <View style={styles.prioritySection}>
+            <View style={[styles.skeletonBlock, { height: 120, borderRadius: radius.xl }]} />
+          </View>
+          <View style={styles.heroWrap}>
+            <View style={[styles.skeletonBlock, { height: HERO_MIN_HEIGHT, borderRadius: radius.xl }]} />
           </View>
           <View style={styles.statsRow}>
             {[1, 2, 3].map((k) => (
@@ -309,71 +298,21 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.topBar}>
-          <View>
-            <TouchableOpacity onPress={() => navigation.getParent()?.navigate('Home' as never)} activeOpacity={0.7}>
-              <Text style={styles.logo}>Velora</Text>
-            </TouchableOpacity>
-            <Text style={styles.welcomeText}>{greeting}</Text>
-          </View>
-          <View style={styles.topBarRight}>
-            <TouchableOpacity
-              style={styles.iconButton}
-              onPress={() => navigation.navigate('Inventory')}
-              testID="search-button"
-            >
-              <Ionicons name="search-outline" size={22} color={colors.textPrimary} />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.iconButton} testID="profile-button">
-              <View style={styles.avatar}>
-                <Ionicons name="person" size={18} color={colors.primary} />
-              </View>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        <View style={styles.heroWrap}>
-          <View style={styles.heroOrbMint} pointerEvents="none" />
-          <View style={styles.heroOrbBlush} pointerEvents="none" />
-          <Animated.View
-            style={[
-              styles.heroCardAnimated,
-              {
-                transform: [{ translateY: heroTranslate }],
-              },
-            ]}
+          <Text style={styles.logo}>Velora</Text>
+          <TouchableOpacity
+            style={styles.settingsButton}
+            onPress={handleSettingsPress}
+            activeOpacity={0.7}
+            testID="settings-button"
+            accessibilityRole="button"
+            accessibilityLabel="Settings"
           >
-            <View style={styles.heroCard}>
-            <Image source={HOME_HERO_IMAGE} style={styles.heroImage} resizeMode="cover" />
-            <View style={styles.heroCopy}>
-              <Text style={styles.heroEyebrow}>Your beauty shelf</Text>
-              <Text style={styles.heroTitle}>A calm, curated beauty shelf.</Text>
-              <Text style={styles.heroSubtitle}>Keep track of what to use next.</Text>
-              <Pressable
-                style={({ pressed }) => [styles.heroScanPill, pressed && { opacity: 0.88 }]}
-                onPress={handleScanPress}
-              >
-                <Ionicons name="scan-outline" size={18} color={colors.primary} />
-                <Text style={styles.heroScanPillText}>Scan a product</Text>
-              </Pressable>
-            </View>
-            </View>
-          </Animated.View>
+            <Ionicons name="settings-outline" size={22} color={colors.textPrimary} />
+          </TouchableOpacity>
         </View>
 
-        <View style={styles.quickActionsRow}>
-          <QuickAction icon="scan-outline" label="Scan" onPress={handleScanPress} testID="quick-scan" />
-          <QuickAction
-            icon="add-circle-outline"
-            label="Add"
-            onPress={() => navigation.getParent()?.navigate('AddProduct' as never)}
-            testID="quick-add"
-          />
-          <QuickAction
-            icon="grid-outline"
-            label="Categories"
-            onPress={() => navigation.getParent()?.navigate('Categories' as never)}
-            testID="quick-categories"
-          />
+        <View style={styles.greetingRow}>
+          <Text style={styles.greetingText}>{greeting}.</Text>
         </View>
 
         <View style={styles.prioritySection}>
@@ -383,13 +322,63 @@ export default function HomeScreen() {
             <Text style={styles.prioritySubtitle}>{reminderTone.subtitle}</Text>
             <TouchableOpacity
               style={styles.priorityButton}
-              activeOpacity={0.8}
+              activeOpacity={0.7}
               onPress={() => handleSummaryCardPress(priorityFilter)}
               testID="priority-review-button"
             >
               <Text style={styles.priorityButtonText}>Review now</Text>
-              <Ionicons name="arrow-forward" size={16} color={colors.primary} />
+              <Ionicons name="arrow-forward" size={16} color={colors.secondary} />
             </TouchableOpacity>
+          </View>
+        </View>
+
+        <HeroBanner onPress={handleScanPress} translateY={heroTranslate} />
+
+        <View style={styles.statsSection}>
+          <Text style={styles.sectionEyebrow}>Shelf summary</Text>
+          <View style={styles.statsRow}>
+            <View style={styles.statsCol}>
+              <SummaryCard
+                variant="compactGrid"
+                title="Use soon"
+                count={stats.expiringSoon}
+                icon="time"
+                color={colors.statusExpiringSoon}
+                iconBackgroundColor={colors.surfaceMuted}
+                surfaceTint={colors.surface}
+                onPress={() => handleSummaryCardPress('expiring_soon')}
+                testID="expiring-soon-card"
+                entranceDelay={0}
+              />
+            </View>
+            <View style={styles.statsCol}>
+              <SummaryCard
+                variant="compactGrid"
+                title="Past date"
+                count={stats.expired}
+                icon="alert-circle"
+                color={colors.statusExpired}
+                iconBackgroundColor={colors.surfaceMuted}
+                surfaceTint={colors.surface}
+                onPress={() => handleSummaryCardPress('expired')}
+                testID="expired-items-card"
+                entranceDelay={60}
+              />
+            </View>
+            <View style={styles.statsCol}>
+              <SummaryCard
+                variant="compactGrid"
+                title="Total collection"
+                count={stats.total}
+                icon="cube"
+                color={colors.textPrimary}
+                iconBackgroundColor={colors.surfaceMuted}
+                surfaceTint={colors.surface}
+                onPress={() => handleSummaryCardPress('all')}
+                testID="total-items-card"
+                entranceDelay={120}
+              />
+            </View>
           </View>
         </View>
 
@@ -409,54 +398,6 @@ export default function HomeScreen() {
           </View>
         )}
 
-        <View style={styles.statsSection}>
-          <Text style={styles.sectionEyebrow}>Shelf summary</Text>
-          <View style={styles.statsRow}>
-            <View style={styles.statsCol}>
-              <SummaryCard
-                variant="compactGrid"
-                title="Use soon"
-                count={stats.expiringSoon}
-                icon="time"
-                color={colors.statusExpiringSoon}
-                iconBackgroundColor={colors.statusExpiringSoonBg}
-                surfaceTint={colors.peach}
-                onPress={() => handleSummaryCardPress('expiring_soon')}
-                testID="expiring-soon-card"
-                entranceDelay={0}
-              />
-            </View>
-            <View style={styles.statsCol}>
-              <SummaryCard
-                variant="compactGrid"
-                title="Past date"
-                count={stats.expired}
-                icon="alert-circle"
-                color={colors.statusExpired}
-                iconBackgroundColor={colors.statusExpiredBg}
-                surfaceTint={colors.blush}
-                onPress={() => handleSummaryCardPress('expired')}
-                testID="expired-items-card"
-                entranceDelay={60}
-              />
-            </View>
-            <View style={styles.statsCol}>
-              <SummaryCard
-                variant="compactGrid"
-                title="Collection"
-                count={stats.total}
-                icon="cube"
-                color={colors.primary}
-                iconBackgroundColor={colors.mintSoft}
-                surfaceTint={colors.mintSoft}
-                onPress={() => handleSummaryCardPress('all')}
-                testID="total-items-card"
-                entranceDelay={120}
-              />
-            </View>
-          </View>
-        </View>
-
         {recentProducts.length > 0 ? (
           <View style={styles.section}>
             <Text style={styles.sectionEyebrow}>New on your shelf</Text>
@@ -472,23 +413,16 @@ export default function HomeScreen() {
             ))}
           </View>
         ) : (
-          <View style={styles.section}>
-            <EmptyState
-              icon="cube-outline"
-              title="No products yet"
-              subtitle="Add your first product to get reminders before they expire"
-            />
-          </View>
+          products.length === 0 && (
+            <View style={styles.section}>
+              <EmptyState
+                icon="cube-outline"
+                title="No products yet"
+                subtitle="Tap the image above to add your first product"
+              />
+            </View>
+          )
         )}
-
-        <ScanButtonWithPressFeedback onPress={handleScanPress} />
-        <TouchableOpacity
-          style={styles.manualEntryLink}
-          onPress={() => navigation.getParent()?.navigate('AddProduct' as never)}
-          testID="add-manually-link"
-        >
-          <Text style={styles.manualEntryLinkText}>Add manually</Text>
-        </TouchableOpacity>
       </ScrollView>
 
       <FirstRunModal
@@ -504,13 +438,13 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.cream,
+    backgroundColor: colors.background,
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: spacing.xl,
+    paddingBottom: SCROLL_BOTTOM_PADDING,
   },
   topBar: {
     flexDirection: 'row',
@@ -518,65 +452,31 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm,
-    paddingBottom: spacing.md,
+    paddingBottom: spacing.xs,
   },
   logo: {
     ...typography.display,
     color: colors.primary,
   },
-  welcomeText: {
-    ...typography.body,
-    color: colors.textSecondary,
-    marginTop: 2,
-  },
-  topBarRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-  iconButton: {
-    padding: spacing.xxs,
-  },
-  avatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.blush,
+  settingsButton: {
+    minWidth: 44,
+    minHeight: 44,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.borderLight,
+  },
+  greetingRow: {
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.md,
+  },
+  greetingText: {
+    ...typography.bodyLarge,
+    color: colors.textSecondary,
   },
   heroWrap: {
     marginHorizontal: spacing.lg,
-    marginBottom: spacing.sm,
-    position: 'relative',
+    marginBottom: spacing.xl,
   },
-  heroOrbMint: {
-    position: 'absolute',
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    backgroundColor: colors.sage,
-    opacity: 0.12,
-    top: -10,
-    right: -18,
-    zIndex: 0,
-  },
-  heroOrbBlush: {
-    position: 'absolute',
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: colors.blushDeep,
-    opacity: 0.1,
-    bottom: 28,
-    left: -14,
-    zIndex: 0,
-  },
-  /** Outer wrapper: transform + shadow; inner card clips image. Avoids RN opacity+overflow+Image glitches after reload. */
   heroCardAnimated: {
-    zIndex: 1,
     borderRadius: radius.xl,
     ...shadow.heroSoft,
   },
@@ -586,103 +486,43 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.borderLight,
+    minHeight: HERO_MIN_HEIGHT,
   },
   heroImage: {
     width: '100%',
-    height: 228,
+    height: HERO_MIN_HEIGHT,
     backgroundColor: colors.heroTint,
   },
-  heroCopy: {
-    padding: spacing.lg,
-    backgroundColor: colors.surface,
+  heroOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(26,26,26,0.28)',
   },
-  heroEyebrow: {
-    ...typography.sectionLabel,
-    color: colors.primary,
-    marginBottom: spacing.xs,
-  },
-  heroTitle: {
-    ...typography.heroTitle,
-    color: colors.textPrimary,
-    marginBottom: spacing.xs,
-  },
-  heroSubtitle: {
-    ...typography.heroTagline,
-    color: colors.textSecondary,
-    marginBottom: spacing.md,
-  },
-  heroScanPill: {
+  heroOverlayContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    alignSelf: 'flex-start',
-    gap: spacing.xs,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderRadius: radius.full,
-    backgroundColor: colors.mintSoft,
-    borderWidth: 1,
-    borderColor: colors.primaryLight,
-  },
-  heroScanPillText: {
-    ...typography.bodyStrong,
-    color: colors.primary,
-  },
-  quickActionsRow: {
-    flexDirection: 'row',
-    alignItems: 'stretch',
-    justifyContent: 'flex-start',
-    paddingHorizontal: spacing.lg,
-    marginTop: 0,
-    marginBottom: spacing.md,
+    padding: spacing.md,
     gap: spacing.sm,
   },
-  quickActionPressable: {
-    flex: 1,
-    flexBasis: 0,
-    flexGrow: 1,
-    flexShrink: 1,
-    minWidth: 0,
-  },
-  quickAction: {
-    width: '100%',
-    height: 120,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.xxs,
-    borderWidth: 1,
-    borderColor: colors.borderLight,
-    ...shadow.cardSubtle,
-  },
-  quickActionLabelWrap: {
-    minHeight: 34,
-    justifyContent: 'center',
-    width: '100%',
-    paddingHorizontal: 2,
-  },
-  quickActionIconWrap: {
+  heroIconRing: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: colors.mintSoft,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.65)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: spacing.xs,
+    backgroundColor: 'rgba(255,255,255,0.12)',
   },
-  quickActionLabel: {
+  heroOverlayText: {
     ...typography.caption,
-    fontWeight: '700',
-    color: colors.textPrimary,
-    textAlign: 'center',
-  },
-  statsSection: {
-    marginBottom: spacing.sm,
+    color: colors.white,
+    letterSpacing: 0.3,
+    flex: 1,
   },
   prioritySection: {
     paddingHorizontal: spacing.lg,
-    marginBottom: spacing.sm,
+    marginBottom: spacing.xl,
   },
   priorityCard: {
     backgroundColor: colors.surface,
@@ -693,15 +533,14 @@ const styles = StyleSheet.create({
     ...shadow.cardSubtle,
   },
   priorityEyebrow: {
-    ...typography.sectionLabel,
+    ...typography.editorialLabel,
     color: colors.textTertiary,
-    marginBottom: spacing.xxs,
+    marginBottom: spacing.sm,
   },
   priorityTitle: {
-    ...typography.title,
+    ...typography.cardTitle,
     color: colors.textPrimary,
     marginBottom: spacing.xs,
-    letterSpacing: -0.2,
   },
   prioritySubtitle: {
     ...typography.body,
@@ -714,22 +553,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     alignSelf: 'flex-start',
     gap: spacing.xs,
+    minHeight: 44,
     paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.sm,
-    borderRadius: radius.full,
-    backgroundColor: colors.primaryTint,
   },
   priorityButtonText: {
-    ...typography.caption,
-    color: colors.primary,
-    fontWeight: '700',
+    ...typography.bodyStrong,
+    color: colors.textPrimary,
+  },
+  statsSection: {
+    marginTop: spacing.xs,
+    marginBottom: spacing.lg,
   },
   statsRow: {
     flexDirection: 'row',
     alignItems: 'stretch',
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.xs,
-    paddingBottom: spacing.sm,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.md,
     gap: spacing.sm,
   },
   statsCol: {
@@ -738,64 +578,29 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   sectionEyebrow: {
-    ...typography.sectionLabel,
+    ...typography.editorialLabel,
     color: colors.textTertiary,
     paddingHorizontal: spacing.lg,
-    marginBottom: spacing.xxs,
+    marginBottom: spacing.sm,
   },
   section: {
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.xs,
   },
   sectionTitle: {
-    ...typography.title,
+    ...typography.cardTitle,
+    fontSize: 18,
     color: colors.textPrimary,
-    marginBottom: spacing.sm,
-    letterSpacing: -0.2,
-  },
-  sectionSupport: {
-    ...typography.body,
-    color: colors.textSecondary,
-    paddingHorizontal: spacing.lg,
-    marginBottom: spacing.xs,
-    lineHeight: 20,
+    marginBottom: spacing.md,
   },
   skeletonBlock: {
     backgroundColor: colors.border,
     borderRadius: radius.md,
   },
-  scanButton: {
-    flexDirection: 'row',
-    backgroundColor: colors.primary,
-    borderRadius: radius.full,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    marginHorizontal: spacing.lg,
-    marginTop: spacing.lg,
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: spacing.sm,
-    ...shadow.fab,
-  },
-  scanButtonText: {
-    ...typography.subtitle,
-    fontSize: 17,
-    color: colors.white,
-  },
-  manualEntryLink: {
-    marginTop: spacing.sm,
-    alignSelf: 'center',
-    paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.md,
-  },
-  manualEntryLinkText: {
-    ...typography.body,
-    fontWeight: '600',
-    color: colors.link,
-  },
   firstRunOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(31,41,55,0.45)',
+    backgroundColor: 'rgba(26,26,26,0.45)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: spacing.lg,
@@ -812,7 +617,7 @@ const styles = StyleSheet.create({
     ...shadow.heroSoft,
   },
   firstRunTitle: {
-    ...typography.title,
+    ...typography.cardTitle,
     color: colors.textPrimary,
     marginBottom: spacing.xs,
     textAlign: 'center',
@@ -834,6 +639,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     width: '100%',
     marginBottom: spacing.sm,
+    minHeight: 44,
   },
   firstRunButtonText: {
     ...typography.bodyLargeStrong,
@@ -845,6 +651,8 @@ const styles = StyleSheet.create({
     width: '100%',
     alignItems: 'center',
     marginBottom: spacing.sm,
+    minHeight: 44,
+    justifyContent: 'center',
   },
   firstRunButtonSecondaryText: {
     ...typography.body,
@@ -854,6 +662,8 @@ const styles = StyleSheet.create({
   firstRunSkip: {
     paddingVertical: spacing.xs,
     paddingHorizontal: spacing.md,
+    minHeight: 44,
+    justifyContent: 'center',
   },
   firstRunSkipText: {
     ...typography.body,

@@ -215,7 +215,20 @@ export default function SettingsScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
+        {navigation.canGoBack() ? (
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={styles.headerBack}
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
+          >
+            <Ionicons name="chevron-back" size={24} color="#1A1A1A" />
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.headerBackPlaceholder} />
+        )}
         <Text style={styles.headerTitle}>Settings</Text>
+        <View style={styles.headerBackPlaceholder} />
       </View>
 
       <ScrollView
@@ -416,16 +429,31 @@ const styles = StyleSheet.create({
     backgroundColor: '#f9fafb',
   },
   header: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 8,
+    paddingVertical: 8,
     backgroundColor: '#ffffff',
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
+  },
+  headerBack: {
+    minWidth: 44,
+    minHeight: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerBackPlaceholder: {
+    width: 44,
+    height: 44,
   },
   headerTitle: {
     fontSize: 20,
     fontWeight: '600',
     color: '#1f2937',
+    flex: 1,
+    textAlign: 'center',
   },
   scrollView: {
     flex: 1,

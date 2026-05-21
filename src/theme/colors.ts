@@ -1,59 +1,59 @@
 /**
- * Design tokens: palette for Velora (fashion-forward, premium feel).
- * Warm neutral background; primary green as accent; soft editorial surfaces.
+ * Design tokens: Luxury Beauty / editorial counter palette.
+ * Cream alabaster backgrounds; charcoal primary; champagne/taupe accents;
+ * muted terracotta and ochre for expiry urgency (text and dots, not loud pills).
  */
 export const colors = {
   // Primary & accent
-  primary: '#10b981',
-  primaryLight: '#d1fae5',
-  primaryTint: '#f0fdf4',
-  secondary: '#e11d48', // soft rose accent for highlights (beauty-adjacent)
-  secondaryLight: '#ffe4e6',
+  primary: '#1A1A1A',
+  primaryLight: '#E8E4DE',
+  primaryTint: '#F5F2ED',
+  secondary: '#C4B5A0',
+  secondaryLight: '#E8E2D9',
 
-  // K-beauty editorial accents (pastel, airy)
-  blush: '#fce7f3',
-  blushDeep: '#f9a8d4',
-  mintSoft: '#ecfdf5',
-  sage: '#a7f3d0',
-  cream: '#fffbf7',
-  peach: '#ffedd5',
-  champagne: '#fef3c7',
-  /** Soft tint for hero / glass-like surfaces */
-  heroTint: '#f0fdf9',
-  heroTint2: '#fdf2f8',
+  // Editorial neutrals (legacy keys mapped to luxury tones)
+  blush: '#F5F0EB',
+  blushDeep: '#E8E2D9',
+  mintSoft: '#F5F2ED',
+  sage: '#E8E4DE',
+  cream: '#FAF9F6',
+  peach: '#FAF6EE',
+  champagne: '#E8E2D9',
+  heroTint: '#F5F2ED',
+  heroTint2: '#EDE9E3',
 
-  // Surfaces (warm editorial)
-  background: '#faf9f7', // warm off-white default
-  backgroundWarm: '#fafaf9',
-  surface: '#ffffff',
-  surfaceMuted: '#f3f4f6',
+  // Surfaces
+  background: '#FAF9F6',
+  backgroundWarm: '#FAF9F6',
+  surface: '#FFFFFF',
+  surfaceMuted: '#F5F2ED',
 
   // Text
-  textPrimary: '#1f2937',
-  textSecondary: '#6b7280',
-  textTertiary: '#9ca3af',
+  textPrimary: '#1A1A1A',
+  textSecondary: '#6B6560',
+  textTertiary: '#9C958D',
 
   // Borders & dividers
-  border: '#e5e7eb',
-  borderLight: '#f3f4f6',
-  iconMuted: '#d1d5db', // chevrons, disabled icons
+  border: '#E8E4DE',
+  borderLight: '#F0EDE8',
+  iconMuted: '#C4B5A0',
 
-  // Status (expiry)
-  statusExpired: '#ef4444',
-  statusExpiredBg: '#fee2e2',
-  statusExpiringSoon: '#f97316',
-  statusExpiringSoonBg: '#fed7aa',
-  statusWarning: '#fbbf24',
-  statusWarningBg: '#fef3c7',
-  statusSafe: '#10b981',
-  statusSafeBg: '#d1fae5',
-  statusMuted: '#6b7280',
-  statusMutedBg: '#f3f4f6',
+  // Status (expiry) — muted, elegant
+  statusExpired: '#8B3A3A',
+  statusExpiredBg: 'transparent',
+  statusExpiringSoon: '#B8860B',
+  statusExpiringSoonBg: '#FAF6EE',
+  statusWarning: '#A67C00',
+  statusWarningBg: '#FAF6EE',
+  statusSafe: '#6B6560',
+  statusSafeBg: '#F5F2ED',
+  statusMuted: '#9C958D',
+  statusMutedBg: '#F5F2ED',
 
   // Interactive
-  link: '#10b981',
-  destructive: '#ef4444',
-  white: '#ffffff',
+  link: '#1A1A1A',
+  destructive: '#8B3A3A',
+  white: '#FFFFFF',
   black: '#000000',
 } as const;
 

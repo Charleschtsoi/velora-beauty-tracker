@@ -3,12 +3,10 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import type { BottomTabBarButtonProps } from '@react-navigation/bottom-tabs';
 import { Animated, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing, typography } from '../theme';
+import { colors, spacing, TAB_BAR_HEIGHT } from '../theme';
 import HomeScreen from '../screens/HomeScreen';
-import ScanScreen from '../screens/ScanScreen';
 import InventoryScreen from '../screens/InventoryScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
-import SettingsScreen from '../screens/SettingsScreen';
 
 const Tab = createBottomTabNavigator();
 
@@ -23,7 +21,7 @@ const tabBarShadow = {
 function AnimatedTabButton(props: BottomTabBarButtonProps) {
   const scale = useRef(new Animated.Value(1)).current;
   const onPressIn = () => {
-    Animated.spring(scale, { toValue: 1.08, useNativeDriver: true, speed: 200 }).start();
+    Animated.spring(scale, { toValue: 1.06, useNativeDriver: true, speed: 200 }).start();
   };
   const onPressOut = () => {
     Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 200 }).start();
@@ -54,13 +52,18 @@ export default function TabNavigator() {
       screenOptions={{
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textTertiary,
+        tabBarLabelStyle: {
+          fontSize: 11,
+          fontWeight: '500',
+          marginBottom: 2,
+        },
         tabBarStyle: {
           backgroundColor: colors.surface,
           borderTopColor: colors.border,
           borderTopWidth: 1,
-          paddingBottom: spacing.xxs,
-          paddingTop: spacing.xxs,
-          height: 60,
+          paddingBottom: spacing.xs,
+          paddingTop: spacing.xs,
+          height: TAB_BAR_HEIGHT,
           ...tabBarShadow,
         },
         headerStyle: {
@@ -78,29 +81,7 @@ export default function TabNavigator() {
         component={HomeScreen}
         options={{
           headerShown: false,
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="home" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="Scan"
-        component={ScanScreen}
-        options={{
-          headerShown: true,
-          headerTitle: 'Scan or add product',
-          headerStyle: {
-            backgroundColor: colors.cream,
-          },
-          headerShadowVisible: false,
-          headerTitleStyle: {
-            ...typography.title,
-            color: colors.textPrimary,
-            fontWeight: '600',
-          },
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="camera" size={size} color={color} />
-          ),
+          tabBarIcon: ({ color, size }) => <Ionicons name="home-outline" size={size} color={color} />,
         }}
       />
       <Tab.Screen
@@ -108,9 +89,7 @@ export default function TabNavigator() {
         component={InventoryScreen}
         options={{
           headerShown: false,
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="list" size={size} color={color} />
-          ),
+          tabBarIcon: ({ color, size }) => <Ionicons name="list-outline" size={size} color={color} />,
         }}
       />
       <Tab.Screen
@@ -119,19 +98,7 @@ export default function TabNavigator() {
         options={{
           headerShown: false,
           tabBarLabel: 'Reminders',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="notifications" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="Settings"
-        component={SettingsScreen}
-        options={{
-          headerShown: false,
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="settings" size={size} color={color} />
-          ),
+          tabBarIcon: ({ color, size }) => <Ionicons name="notifications-outline" size={size} color={color} />,
         }}
       />
     </Tab.Navigator>
