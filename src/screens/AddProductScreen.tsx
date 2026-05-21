@@ -10,7 +10,8 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { useProducts } from '../context/ProductContext';
 import { ProductCategory } from '../types/product.types';
@@ -73,8 +74,10 @@ const initialFieldSources: Record<AIFieldKey, FieldSourceInfo> = {
   notes: null,
 };
 
+type AddProductNavigationProp = NativeStackNavigationProp<RootStackParamList, 'AddProduct'>;
+
 export default function AddProductScreen() {
-  const navigation = useNavigation<any>();
+  const navigation = useNavigation<AddProductNavigationProp>();
   const route = useRoute<AddProductRouteProp>();
   const { addProduct } = useProducts();
 
@@ -172,8 +175,7 @@ export default function AddProductScreen() {
     [mergeNotes],
   );
 
-  // Pre-fill form data from route params (barcode, UPC, AI data)
-  useEffect(() => {
+  const applyRouteParams = useCallback(() => {
     const params = route.params;
     if (!params) return;
 
@@ -191,14 +193,29 @@ export default function AddProductScreen() {
 
     if (params.upcData) {
       applyIncomingFields(params.upcData, 'Barcode lookup');
-      showToast('Barcode data loaded. Confirm details and save.', 'success');
     }
 
     if (params.aiData) {
       applyIncomingFields(params.aiData, 'AI photo');
-      showToast('AI data loaded. Please confirm details.', 'success');
+    }
+
+    if (params.aiFlatData) {
+      const flatAsMap: Partial<AIFieldMap> = {};
+      (Object.keys(params.aiFlatData) as AIFieldKey[]).forEach((key) => {
+        const value = params.aiFlatData?.[key];
+        if (value) {
+          flatAsMap[key] = { value, confidence: null, source: 'AI photo' };
+        }
+      });
+      applyIncomingFields(flatAsMap, 'AI photo');
     }
   }, [route.params, applyIncomingFields]);
+
+  useFocusEffect(
+    useCallback(() => {
+      applyRouteParams();
+    }, [applyRouteParams])
+  );
 
   const renderSourceTag = (field: AIFieldKey) => {
     const info = fieldSources[field];
@@ -246,17 +263,12 @@ export default function AddProductScreen() {
         notes: notes.trim() || undefined,
         usageCount: quantity,
       });
-      if (newProduct) onProductSaved(newProduct);
-
+      if (!newProduct?.id) {
+        throw new Error('Product was not created');
+      }
+      await onProductSaved(newProduct);
       showToast('Product added successfully!', 'success');
-      Alert.alert(
-        'Product saved',
-        'Add another product or go back to your collection.',
-        [
-          { text: 'Add another', onPress: resetForm },
-          { text: 'Back to collection', onPress: () => navigation.navigate('MainTabs', { screen: 'Inventory' }) },
-        ]
-      );
+      navigation.replace('ProductDetail', { productId: newProduct.id });
     } catch (error) {
       showToast(
         error instanceof Error

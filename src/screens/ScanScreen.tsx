@@ -15,6 +15,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { CameraView, useCameraPermissions, BarcodeScanningResult, type CameraType } from 'expo-camera';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RootStackParamList } from '../navigation/AppNavigator';
+import type { DemoProductInput } from '../config/demoProducts';
 import { showToast } from '../utils/toast';
 import { analyzeProductImage, isAIServiceConfigured, type AIFieldKey, type AIFieldMap } from '../services/aiService';
 import { lookupProductByBarcode } from '../services/upcService';
@@ -40,7 +43,10 @@ const VIBRATION_PATTERN = 100;
 
 type ScanMode = 'barcode' | 'ai';
 
+type ScanNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Scan'>;
+
 export default function ScanScreen() {
+  const navigation = useNavigation<ScanNavigationProp>();
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
@@ -52,8 +58,57 @@ export default function ScanScreen() {
   const [cameraReady, setCameraReady] = useState(false);
   const [isAddingDemo, setIsAddingDemo] = useState(false); // demo "thinking" state
   const cameraRef = useRef<any>(null);
-  const navigation = useNavigation<any>();
   const { addProduct } = useProducts();
+
+  const openAddProduct = (params: RootStackParamList['AddProduct']) => {
+    navigation.navigate('AddProduct', params);
+  };
+
+  const openProductDetail = (productId: string) => {
+    navigation.replace('ProductDetail', { productId });
+  };
+
+  const saveDemoAndShowDetail = async (
+    demo: DemoProductInput,
+    options?: { barcode?: string; photoUri?: string }
+  ) => {
+    try {
+      const newProduct = await addProduct({
+        name: demo.name,
+        brand: demo.brand,
+        category: demo.category,
+        expirationDate: demo.expirationDate,
+        photoUrl: options?.photoUri ?? demo.demoPhotoUri,
+        notes: demo.notes,
+        barcode: options?.barcode,
+      });
+      if (!newProduct?.id) {
+        showToast('Could not save product. Please try again.', 'error');
+        return;
+      }
+      await onProductSaved(newProduct);
+      showToast('Product added to your collection', 'success');
+      openProductDetail(newProduct.id);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to save product', 'error');
+      openAddProduct({
+        barcode: options?.barcode,
+        photoUri: options?.photoUri ?? demo.demoPhotoUri,
+        aiData: {
+          name: { value: demo.name, confidence: 0.92, source: 'Demo' },
+          brand: { value: demo.brand ?? null, confidence: 0.92, source: 'Demo' },
+          category: { value: demo.category, confidence: 0.92, source: 'Demo' },
+          expirationDate: {
+            value: demo.expirationDate.toISOString().slice(0, 10),
+            confidence: 0.92,
+            source: 'Demo',
+          },
+          notes: { value: demo.notes ?? null, confidence: 0.92, source: 'Demo' },
+          ingredients: { value: null, confidence: null, source: 'Demo' },
+        },
+      });
+    }
+  };
   const aiConfigured = isAIServiceConfigured();
   const aiModeAvailable = DEMO_MODE || aiConfigured; // In demo, AI Photo works without backend
   const knownFieldsRef = useRef<Partial<Record<AIFieldKey, string>>>({});
@@ -133,28 +188,13 @@ export default function ScanScreen() {
         const idx = demoProductIndexRef.current % DEMO_PRODUCTS.length;
         demoProductIndexRef.current += 1;
         const demo = DEMO_PRODUCTS[idx];
-        const source = 'Barcode lookup';
-        const confidence = 0.92;
-        const upcData: Partial<AIFieldMap> = {
-          name: { value: demo.name, confidence, source },
-          brand: { value: demo.brand ?? null, confidence, source },
-          category: { value: demo.category, confidence, source },
-          expirationDate: {
-            value: demo.expirationDate.toISOString().slice(0, 10),
-            confidence,
-            source,
-          },
-          notes: { value: demo.notes ?? null, confidence, source },
-        };
         setIsAddingDemo(false);
         setScanned(false);
         processingScanRef.current = false;
-        navigation.getParent()?.navigate('AddProduct' as never, {
+        await saveDemoAndShowDetail(demo, {
           barcode: barcodeValue,
-          upcData,
-          photoUri: demo.demoPhotoUri ?? undefined,
+          photoUri: demo.demoPhotoUri,
         });
-        showToast('Barcode lookup complete. Confirm details and save.', 'success');
         return;
       }
 
@@ -191,7 +231,7 @@ export default function ScanScreen() {
         showToast(errorMessage, 'error');
       }
 
-      navigation.getParent()?.navigate('AddProduct' as never, {
+      openAddProduct({
         barcode: barcodeValue,
         upcData,
         scanNotFound: !lookup.success || !lookup.data,
@@ -205,7 +245,7 @@ export default function ScanScreen() {
       processingScanRef.current = false;
       setLookupInProgress(false);
       showToast('Error scanning barcode. Please try again.', 'error');
-      navigation.getParent()?.navigate('AddProduct' as never, {
+      openAddProduct({
         barcode: barcodeValue,
         scanNotFound: true,
       });
@@ -263,7 +303,7 @@ export default function ScanScreen() {
   };
 
   const handleManualEntry = () => {
-    navigation.getParent()?.navigate('AddProduct' as never);
+    openAddProduct(undefined);
   };
 
   const toggleFlashlight = () => {
@@ -322,27 +362,12 @@ export default function ScanScreen() {
         const idx = demoProductIndexRef.current % DEMO_PRODUCTS.length;
         demoProductIndexRef.current += 1;
         const demo = DEMO_PRODUCTS[idx];
-        const source = 'AI photo';
-        const confidence = 0.92;
-        const aiData: Partial<AIFieldMap> = {
-          name: { value: demo.name, confidence, source },
-          brand: { value: demo.brand ?? null, confidence, source },
-          category: { value: demo.category, confidence, source },
-          expirationDate: {
-            value: demo.expirationDate.toISOString().slice(0, 10),
-            confidence,
-            source,
-          },
-          notes: { value: demo.notes ?? null, confidence, source },
-        };
         setIsScanning(false);
         setIsAnalyzing(false);
         setScanned(false);
-        navigation.getParent()?.navigate('AddProduct' as never, {
-          photoUri: photo?.uri ?? demo.demoPhotoUri ?? undefined,
-          aiData,
+        await saveDemoAndShowDetail(demo, {
+          photoUri: photo?.uri ?? demo.demoPhotoUri,
         });
-        showToast('Analysis complete. Confirm details and save.', 'success');
         return;
       }
 
@@ -367,7 +392,7 @@ export default function ScanScreen() {
 
       setTimeout(() => {
         showToast('Product analyzed! Filling form...', 'success');
-        navigation.getParent()?.navigate('AddProduct' as never, {
+        openAddProduct({
           aiData: analysisResult.fields,
           aiFlatData: analysisResult.flatData,
           photoUri: capturedPhotoUri,
@@ -380,7 +405,7 @@ export default function ScanScreen() {
       setIsScanning(false);
       setScanned(false);
       showToast(error.message || 'Failed to analyze image. Please try again.', 'error');
-      navigation.getParent()?.navigate('AddProduct' as never, {
+      openAddProduct({
         photoUri: photo?.uri,
         scanNotFound: true,
       });
