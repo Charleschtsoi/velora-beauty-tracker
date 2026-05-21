@@ -24,6 +24,13 @@ import { colors, spacing, radius, shadow, typography } from '../theme';
 import * as settingsStorage from '../services/settingsStorage';
 import { HOME_HERO_IMAGE } from '../assets/homeHeroImage';
 
+function getGreeting() {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Good morning';
+  if (hour < 18) return 'Good afternoon';
+  return 'Good evening';
+}
+
 function ScanButtonWithPressFeedback({ onPress }: { onPress: () => void }) {
   const scale = useRef(new Animated.Value(1)).current;
   return (
@@ -204,6 +211,36 @@ export default function HomeScreen() {
   const expiringSoonProducts = useMemo(() => {
     return [...products].sort((a, b) => a.expirationDate.getTime() - b.expirationDate.getTime()).slice(0, 3);
   }, [products]);
+  const greeting = useMemo(() => getGreeting(), []);
+  const reminderTone = useMemo(() => {
+    if (stats.expiringSoon > 0) {
+      return {
+        eyebrow: 'What needs care',
+        title:
+          stats.expiringSoon === 1
+            ? '1 product is coming up soon'
+            : `${stats.expiringSoon} products are coming up soon`,
+        subtitle: 'Start with the ones expiring first so nothing you love slips past its best date.',
+      };
+    }
+    if (stats.expired > 0) {
+      return {
+        eyebrow: 'What needs care',
+        title: stats.expired === 1 ? '1 item needs a reset' : `${stats.expired} items need a reset`,
+        subtitle: 'Review anything past date and decide what to keep, finish, or let go of.',
+      };
+    }
+    return {
+      eyebrow: 'What needs care',
+      title: 'Your shelf is looking fresh',
+      subtitle: 'Nothing urgent right now, so you can simply enjoy what is already in your routine.',
+    };
+  }, [stats.expired, stats.expiringSoon]);
+  const priorityFilter = useMemo<'expiring_soon' | 'expired' | 'all'>(() => {
+    if (stats.expiringSoon > 0) return 'expiring_soon';
+    if (stats.expired > 0) return 'expired';
+    return 'all';
+  }, [stats.expired, stats.expiringSoon]);
 
   const handleSummaryCardPress = (filter?: 'expiring_soon' | 'expired' | 'all') => {
     navigation.navigate('Inventory', { filter });
@@ -272,9 +309,12 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.topBar}>
-          <TouchableOpacity onPress={() => navigation.getParent()?.navigate('Home' as never)} activeOpacity={0.7}>
-            <Text style={styles.logo}>Velora</Text>
-          </TouchableOpacity>
+          <View>
+            <TouchableOpacity onPress={() => navigation.getParent()?.navigate('Home' as never)} activeOpacity={0.7}>
+              <Text style={styles.logo}>Velora</Text>
+            </TouchableOpacity>
+            <Text style={styles.welcomeText}>{greeting}</Text>
+          </View>
           <View style={styles.topBarRight}>
             <TouchableOpacity
               style={styles.iconButton}
@@ -306,7 +346,7 @@ export default function HomeScreen() {
             <Image source={HOME_HERO_IMAGE} style={styles.heroImage} resizeMode="cover" />
             <View style={styles.heroCopy}>
               <Text style={styles.heroEyebrow}>Your beauty shelf</Text>
-              <Text style={styles.heroTitle}>Beautifully organized</Text>
+              <Text style={styles.heroTitle}>A calm, curated beauty shelf.</Text>
               <Text style={styles.heroSubtitle}>Keep track of what to use next.</Text>
               <Pressable
                 style={({ pressed }) => [styles.heroScanPill, pressed && { opacity: 0.88 }]}
@@ -336,13 +376,46 @@ export default function HomeScreen() {
           />
         </View>
 
+        <View style={styles.prioritySection}>
+          <View style={styles.priorityCard}>
+            <Text style={styles.priorityEyebrow}>{reminderTone.eyebrow}</Text>
+            <Text style={styles.priorityTitle}>{reminderTone.title}</Text>
+            <Text style={styles.prioritySubtitle}>{reminderTone.subtitle}</Text>
+            <TouchableOpacity
+              style={styles.priorityButton}
+              activeOpacity={0.8}
+              onPress={() => handleSummaryCardPress(priorityFilter)}
+              testID="priority-review-button"
+            >
+              <Text style={styles.priorityButtonText}>Review now</Text>
+              <Ionicons name="arrow-forward" size={16} color={colors.primary} />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {expiringSoonProducts.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionEyebrow}>Start here</Text>
+            <Text style={styles.sectionTitle}>Products to review first</Text>
+            {expiringSoonProducts.map((product, index) => (
+              <ProductCard
+                key={product.id}
+                product={product}
+                onPress={() => handleProductPress(product.id)}
+                testID={`expiring-soon-product-${product.id}`}
+                entranceDelay={index * 50}
+              />
+            ))}
+          </View>
+        )}
+
         <View style={styles.statsSection}>
-          <Text style={styles.sectionEyebrow}>At a glance</Text>
+          <Text style={styles.sectionEyebrow}>Shelf summary</Text>
           <View style={styles.statsRow}>
             <View style={styles.statsCol}>
               <SummaryCard
                 variant="compactGrid"
-                title="Expiring soon"
+                title="Use soon"
                 count={stats.expiringSoon}
                 icon="time"
                 color={colors.statusExpiringSoon}
@@ -356,7 +429,7 @@ export default function HomeScreen() {
             <View style={styles.statsCol}>
               <SummaryCard
                 variant="compactGrid"
-                title="Expired"
+                title="Past date"
                 count={stats.expired}
                 icon="alert-circle"
                 color={colors.statusExpired}
@@ -370,7 +443,7 @@ export default function HomeScreen() {
             <View style={styles.statsCol}>
               <SummaryCard
                 variant="compactGrid"
-                title="In collection"
+                title="Collection"
                 count={stats.total}
                 icon="cube"
                 color={colors.primary}
@@ -383,22 +456,6 @@ export default function HomeScreen() {
             </View>
           </View>
         </View>
-
-        {expiringSoonProducts.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionEyebrow}>Finish soon</Text>
-            <Text style={styles.sectionTitle}>Fresh picks</Text>
-            {expiringSoonProducts.map((product, index) => (
-              <ProductCard
-                key={product.id}
-                product={product}
-                onPress={() => handleProductPress(product.id)}
-                testID={`expiring-soon-product-${product.id}`}
-                entranceDelay={index * 50}
-              />
-            ))}
-          </View>
-        )}
 
         {recentProducts.length > 0 ? (
           <View style={styles.section}>
@@ -466,6 +523,11 @@ const styles = StyleSheet.create({
   logo: {
     ...typography.display,
     color: colors.primary,
+  },
+  welcomeText: {
+    ...typography.body,
+    color: colors.textSecondary,
+    marginTop: 2,
   },
   topBarRight: {
     flexDirection: 'row',
@@ -618,6 +680,50 @@ const styles = StyleSheet.create({
   statsSection: {
     marginBottom: spacing.sm,
   },
+  prioritySection: {
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.sm,
+  },
+  priorityCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.xl,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    ...shadow.cardSubtle,
+  },
+  priorityEyebrow: {
+    ...typography.sectionLabel,
+    color: colors.textTertiary,
+    marginBottom: spacing.xxs,
+  },
+  priorityTitle: {
+    ...typography.title,
+    color: colors.textPrimary,
+    marginBottom: spacing.xs,
+    letterSpacing: -0.2,
+  },
+  prioritySubtitle: {
+    ...typography.body,
+    color: colors.textSecondary,
+    lineHeight: 20,
+    marginBottom: spacing.sm,
+  },
+  priorityButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: spacing.xs,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.full,
+    backgroundColor: colors.primaryTint,
+  },
+  priorityButtonText: {
+    ...typography.caption,
+    color: colors.primary,
+    fontWeight: '700',
+  },
   statsRow: {
     flexDirection: 'row',
     alignItems: 'stretch',
@@ -646,6 +752,13 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     marginBottom: spacing.sm,
     letterSpacing: -0.2,
+  },
+  sectionSupport: {
+    ...typography.body,
+    color: colors.textSecondary,
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.xs,
+    lineHeight: 20,
   },
   skeletonBlock: {
     backgroundColor: colors.border,

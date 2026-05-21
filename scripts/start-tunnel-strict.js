@@ -27,6 +27,13 @@ const ERROR_PATTERNS = [
   /ngrok/i,
 ];
 
+function extractConnectionTarget(line) {
+  const match = line.match(/(?:exps?|https?):\/\/\S+/i);
+  if (!match || !match[0]) return null;
+  // Trim trailing punctuation/noise that sometimes appears in terminal output.
+  return match[0].replace(/[),.;]+$/, "");
+}
+
 function getEnvInt(name, fallback) {
   const raw = process.env[name];
   if (!raw) return fallback;
@@ -95,10 +102,14 @@ function runExpoStart({ port }) {
     const onLine = (line) => {
       if (!line) return;
 
-      // Capture an exp://... payload if Expo prints one.
-      if (!connectionTarget) {
-        const m = line.match(/exp[^\s]*:\/\//i);
-        if (m && m[0]) connectionTarget = m[0];
+      // Capture the full device connection URL if Expo prints one.
+      const discoveredTarget = extractConnectionTarget(line);
+      if (discoveredTarget) {
+        connectionTarget = discoveredTarget;
+        if (ready && !printedConnectionTarget) {
+          printedConnectionTarget = true;
+          console.log(`\nConnection target (for this run): ${connectionTarget}\n`);
+        }
       }
 
       if (!ready && READY_PATTERNS.some((r) => r.test(line))) {
@@ -106,11 +117,13 @@ function runExpoStart({ port }) {
         clearTimeout(timeout);
 
         if (!printedConnectionTarget) {
-          printedConnectionTarget = true;
-          // Keep this single line so it's easy to copy/paste into Expo Go if needed.
-          console.log(
-            `\nConnection target (for this run): ${connectionTarget || "(scan the QR shown above)"}\n`
-          );
+          if (connectionTarget) {
+            printedConnectionTarget = true;
+            // Keep this single line so it's easy to copy/paste into Expo Go if needed.
+            console.log(`\nConnection target (for this run): ${connectionTarget}\n`);
+          } else {
+            console.log("\nConnection target not printed by Expo yet; watch for it below or scan the QR shown above.\n");
+          }
         }
       }
 
