@@ -11,6 +11,26 @@ interface CacheRecord {
   updated_at: string;
 }
 
+interface DemoProductRow {
+  id: string;
+  name: string;
+  brand: string;
+  category: string;
+  volume: string;
+  expiration_date: string;
+  production_date: string | null;
+  notes: string;
+  demo_photo_uri: string | null;
+  barcode: string | null;
+  primary_ocr_cues: string[];
+  secondary_ocr_cues: string[];
+  packaging_color: string;
+  ingredients_summary: string;
+  routine_advice: string;
+  enabled: boolean;
+  sort_order: number;
+}
+
 interface LookupResponse {
   success: boolean;
   fromCache: boolean;
@@ -25,7 +45,8 @@ const corsHeaders = {
 };
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
-const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+const SERVICE_ROLE_KEY =
+  Deno.env.get("SERVICE_ROLE_KEY") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
 if (!SUPABASE_URL) {
   console.warn("SUPABASE_URL is not set. Edge function will fail.");
@@ -41,6 +62,89 @@ const supabase = SUPABASE_URL && SERVICE_ROLE_KEY
   : null;
 
 const CACHE_TTL_HOURS = 24 * 7; // 7 days
+
+function mapDemoProductRow(row: DemoProductRow): Record<string, unknown> {
+  return {
+    id: row.id,
+    name: row.name,
+    brand: row.brand,
+    category: row.category,
+    size: row.volume,
+    volume: row.volume,
+    expirationDate: row.expiration_date,
+    productionDate: row.production_date,
+    notes: row.notes,
+    ingredients: row.ingredients_summary,
+    routineAdvice: row.routine_advice,
+    demoPhotoUri: row.demo_photo_uri,
+    barcode: row.barcode,
+    packagingColor: row.packaging_color,
+    primaryOcrCues: row.primary_ocr_cues,
+    secondaryOcrCues: row.secondary_ocr_cues,
+    source: "demo_catalog",
+    confidence: 1,
+    demoProduct: {
+      id: row.id,
+      name: row.name,
+      brand: row.brand,
+      category: row.category,
+      volume: row.volume,
+      expirationDate: row.expiration_date,
+      productionDate: row.production_date,
+      notes: row.notes,
+      demoPhotoUri: row.demo_photo_uri,
+      barcode: row.barcode,
+      matcherHints: {
+        primaryOcrCues: row.primary_ocr_cues,
+        secondaryOcrCues: row.secondary_ocr_cues,
+        packagingColor: row.packaging_color,
+      },
+      mockAiEnrichment: {
+        ingredientsSummary: row.ingredients_summary,
+        routineAdvice: row.routine_advice,
+      },
+    },
+  };
+}
+
+async function fetchFromDemoCatalog(barcode: string): Promise<LookupResponse | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from<DemoProductRow>("demo_products")
+    .select(`
+      id,
+      name,
+      brand,
+      category,
+      volume,
+      expiration_date,
+      production_date,
+      notes,
+      demo_photo_uri,
+      barcode,
+      primary_ocr_cues,
+      secondary_ocr_cues,
+      packaging_color,
+      ingredients_summary,
+      routine_advice,
+      enabled,
+      sort_order
+    `)
+    .eq("barcode", barcode)
+    .eq("enabled", true)
+    .maybeSingle();
+
+  if (error || !data) {
+    return null;
+  }
+
+  return {
+    success: true,
+    fromCache: false,
+    data: mapDemoProductRow(data),
+    confidence: 1,
+  };
+}
 
 async function fetchFromCache(barcode: string): Promise<LookupResponse | null> {
   if (!supabase) return null;
@@ -171,7 +275,14 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Try cache first
+    const demoCatalogResult = await fetchFromDemoCatalog(barcode);
+    if (demoCatalogResult) {
+      return new Response(JSON.stringify(demoCatalogResult), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Try cache next
     const cached = await fetchFromCache(barcode);
     if (cached) {
       return new Response(JSON.stringify(cached), {

@@ -4,8 +4,9 @@
 
 const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
 const MAX_IMAGE_SIZE_BYTES = 4 * 1024 * 1024; // 4MB
+const GEMINI_MODEL = "gemini-3.5-flash";
 
-const FIELDS = ["name", "brand", "category", "expirationDate", "ingredients", "notes"] as const;
+const FIELDS = ["name", "brand", "category", "packagingColor", "expirationDate", "ingredients", "notes"] as const;
 
 const PROMPT_TEMPLATE = (knownFieldsSummary: string) => `
 You are a diligent assistant extracting beauty product metadata. Use the provided label image and known fields.
@@ -18,6 +19,7 @@ Return STRICT JSON with the following shape:
   "name": {"value": string | null, "confidence": number},
   "brand": {"value": string | null, "confidence": number},
   "category": {"value": string | null, "confidence": number},
+  "packagingColor": {"value": string | null, "confidence": number},
   "expirationDate": {"value": string | null, "confidence": number, "format": "YYYY-MM-DD"},
   "ingredients": {"value": string | null, "confidence": number},
   "notes": {"value": string | null, "confidence": number}
@@ -25,6 +27,7 @@ Return STRICT JSON with the following shape:
 
 - confidence MUST be between 0 and 1.
 - If a value is unknown, set value to null and confidence to 0.
+- packagingColor should be a short lowercase hyphenated description of the package appearance, e.g. "yellow-gold", "white-silver", "transparent-brown", "dark-red", "glass-pink", "matte-black".
 - Do not invent information.`;
 
 const corsHeaders = {
@@ -152,7 +155,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const prompt = PROMPT_TEMPLATE(summariseKnownFields(knownFields));
 
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -171,8 +174,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
             },
           ],
           generationConfig: {
-            temperature: 0.1,
-            maxOutputTokens: 500,
+            maxOutputTokens: 1024,
           },
         }),
       }

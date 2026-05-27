@@ -9,7 +9,7 @@ export interface BarcodeLookupField {
 export type BarcodeLookupResult = {
   success: boolean;
   fromCache: boolean;
-  data?: Record<string, BarcodeLookupField | string | null>;
+  data?: Record<string, unknown>;
   confidence?: number;
   error?: string;
 };

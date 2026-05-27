@@ -10,6 +10,8 @@ import {
   Platform,
   ActivityIndicator,
   Animated,
+  Modal,
+  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { CameraView, useCameraPermissions, BarcodeScanningResult, type CameraType } from 'expo-camera';
@@ -17,13 +19,30 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/AppNavigator';
-import type { DemoProductInput } from '../config/demoProducts';
 import { showToast } from '../utils/toast';
-import { analyzeProductImage, isAIServiceConfigured, type AIFieldKey, type AIFieldMap } from '../services/aiService';
+import {
+  analyzeProductImage,
+  isAIServiceConfigured,
+  resolveDemoProductImage,
+  type AIFieldKey,
+  type AIFieldMap,
+} from '../services/aiService';
 import { lookupProductByBarcode } from '../services/upcService';
 import { useProducts } from '../context/ProductContext';
 import { DEMO_MODE } from '../config/demoMode';
-import { DEMO_PRODUCTS } from '../config/demoProducts';
+import {
+  DEMO_PRODUCTS,
+  type DemoProductInput,
+  getDemoExpirationDate,
+  getDemoProductNotes,
+  mapDemoCategoryToProductCategory,
+} from '../config/demoProducts';
+import {
+  resolveDemoProductByAiFields,
+  resolveDemoProductByBarcode,
+  resolveDemoProductManually,
+  type DemoMatchResult,
+} from '../services/demoScanResolver';
 import { onProductSaved } from '../services/localNotificationService';
 import { colors, spacing, radius, shadow, typography } from '../theme';
 
@@ -40,8 +59,48 @@ const IDLE_TIPS = [
 
 // Vibration pattern for successful scan
 const VIBRATION_PATTERN = 100;
+// AI photo runs Gemini vision + catalog match; needs more than barcode lookup.
+const DEMO_AI_BACKEND_TIMEOUT_MS = 8000;
+const DEMO_BARCODE_BACKEND_TIMEOUT_MS = 4000;
+
+const BARCODE_SCAN_TYPES = [
+  'ean13',
+  'ean8',
+  'upc_a',
+  'upc_e',
+  'code128',
+  'code39',
+  'code93',
+  'codabar',
+  'itf14',
+  'qr',
+] as const;
 
 type ScanMode = 'barcode' | 'ai';
+
+type PostBarcodeCaptureContext =
+  | { kind: 'demo'; product: DemoProductInput; barcode: string }
+  | {
+      kind: 'add';
+      barcode: string;
+      upcData?: Record<string, { value: string | null; confidence: number | null; source: string }>;
+      scanNotFound?: boolean;
+    };
+
+function formatDemoProductLabel(product: DemoProductInput): string {
+  return `${product.brand} · ${product.name}`;
+}
+
+function formatDetectionSummary(fields?: Partial<AIFieldMap> | null): string | null {
+  if (!fields) return null;
+  const brand = fields.brand?.value?.trim();
+  const name = fields.name?.value?.trim();
+  const parts = [brand, name].filter(Boolean) as string[];
+  if (parts.length > 0) return parts.join(' · ');
+  const color = fields.packagingColor?.value?.trim();
+  if (color) return `packaging (${color})`;
+  return null;
+}
 
 type ScanNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Scan'>;
 
@@ -57,6 +116,17 @@ export default function ScanScreen() {
   const [lookupInProgress, setLookupInProgress] = useState(false);
   const [cameraReady, setCameraReady] = useState(false);
   const [isAddingDemo, setIsAddingDemo] = useState(false); // demo "thinking" state
+  const [presenterPickerVisible, setPresenterPickerVisible] = useState(false);
+  const [pendingDemoContext, setPendingDemoContext] = useState<{
+    barcode?: string;
+    photoUri?: string;
+    source?: ScanMode | 'chooser';
+    detectedSummary?: string;
+  }>({});
+  const [postBarcodeCapture, setPostBarcodeCapture] = useState<PostBarcodeCaptureContext | null>(
+    null
+  );
+  const [aiSessionBarcode, setAiSessionBarcode] = useState<string | null>(null);
   const cameraRef = useRef<any>(null);
   const { addProduct } = useProducts();
 
@@ -68,6 +138,99 @@ export default function ScanScreen() {
     navigation.replace('ProductDetail', { productId });
   };
 
+  const openPresenterPicker = (
+    context?: {
+      barcode?: string;
+      photoUri?: string;
+      source?: ScanMode | 'chooser';
+      detectedSummary?: string;
+    }
+  ) => {
+    setPendingDemoContext(context ?? {});
+    setPresenterPickerVisible(true);
+  };
+
+  const closePresenterPicker = () => {
+    setPresenterPickerVisible(false);
+    setPendingDemoContext({});
+  };
+
+  const presenterPickerCopy =
+    pendingDemoContext.source === 'barcode'
+      ? "We couldn't confirm this barcode automatically. Choose the matching demo product below."
+      : pendingDemoContext.source === 'ai'
+        ? pendingDemoContext.detectedSummary
+          ? `We read “${pendingDemoContext.detectedSummary}” on the label. Choose the closest match below.`
+          : "We couldn't confirm this product label automatically. Choose the closest demo product below."
+        : 'Choose one of the demo products below to keep moving through the demo.';
+
+  const handlePresenterSelect = async (productId: string) => {
+    const resolved = resolveDemoProductManually(productId);
+    closePresenterPicker();
+    if (!resolved.product) {
+      showToast('Unable to load that demo product.', 'error');
+      return;
+    }
+    if (pendingDemoContext.photoUri) {
+      await saveDemoAndShowDetail(resolved.product, pendingDemoContext);
+      return;
+    }
+    beginPostBarcodePhotoFlow(resolved.product, pendingDemoContext.barcode);
+  };
+
+  const beginPostBarcodePhotoFlow = (product: DemoProductInput, barcode?: string) => {
+    const barcodeValue = barcode ?? product.barcode ?? '';
+    setPostBarcodeCapture({ kind: 'demo', product, barcode: barcodeValue });
+    setScanMode('ai');
+    setIsScanning(true);
+    setScanned(false);
+    setCameraReady(false);
+    processingScanRef.current = false;
+    showToast('Now take a quick photo of the product', 'info');
+  };
+
+  const beginAddProductPhotoFlow = (params: {
+    barcode: string;
+    upcData?: Record<string, { value: string | null; confidence: number | null; source: string }>;
+    scanNotFound?: boolean;
+  }) => {
+    setPostBarcodeCapture({
+      kind: 'add',
+      barcode: params.barcode,
+      upcData: params.upcData,
+      scanNotFound: params.scanNotFound,
+    });
+    setScanMode('ai');
+    setIsScanning(true);
+    setScanned(false);
+    setCameraReady(false);
+    processingScanRef.current = false;
+    showToast('Now take a quick photo of the product', 'info');
+  };
+
+  const finishPostBarcodePhotoStep = async (photoUri?: string) => {
+    const ctx = postBarcodeCapture;
+    if (!ctx) return;
+    setPostBarcodeCapture(null);
+    setIsScanning(false);
+    setIsAnalyzing(false);
+
+    if (ctx.kind === 'demo') {
+      await saveDemoAndShowDetail(ctx.product, {
+        barcode: ctx.barcode,
+        photoUri,
+      });
+      return;
+    }
+
+    openAddProduct({
+      barcode: ctx.barcode,
+      photoUri,
+      upcData: ctx.upcData,
+      scanNotFound: ctx.scanNotFound,
+    });
+  };
+
   const saveDemoAndShowDetail = async (
     demo: DemoProductInput,
     options?: { barcode?: string; photoUri?: string }
@@ -76,11 +239,11 @@ export default function ScanScreen() {
       const newProduct = await addProduct({
         name: demo.name,
         brand: demo.brand,
-        category: demo.category,
-        expirationDate: demo.expirationDate,
-        photoUrl: options?.photoUri ?? demo.demoPhotoUri,
-        notes: demo.notes,
-        barcode: options?.barcode,
+        category: mapDemoCategoryToProductCategory(demo.category),
+        expirationDate: getDemoExpirationDate(demo),
+        photoUrl: options?.photoUri,
+        notes: getDemoProductNotes(demo),
+        barcode: options?.barcode ?? demo.barcode,
       });
       if (!newProduct?.id) {
         showToast('Could not save product. Please try again.', 'error');
@@ -92,19 +255,36 @@ export default function ScanScreen() {
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Failed to save product', 'error');
       openAddProduct({
-        barcode: options?.barcode,
-        photoUri: options?.photoUri ?? demo.demoPhotoUri,
+        barcode: options?.barcode ?? demo.barcode,
+        photoUri: options?.photoUri,
         aiData: {
           name: { value: demo.name, confidence: 0.92, source: 'Demo' },
           brand: { value: demo.brand ?? null, confidence: 0.92, source: 'Demo' },
-          category: { value: demo.category, confidence: 0.92, source: 'Demo' },
-          expirationDate: {
-            value: demo.expirationDate.toISOString().slice(0, 10),
+          category: {
+            value: demo.category === 'sunscreen' ? 'skincare' : demo.category,
             confidence: 0.92,
             source: 'Demo',
           },
-          notes: { value: demo.notes ?? null, confidence: 0.92, source: 'Demo' },
-          ingredients: { value: null, confidence: null, source: 'Demo' },
+          packagingColor: {
+            value: demo.matcherHints.packagingColor,
+            confidence: 0.9,
+            source: 'Demo',
+          },
+          expirationDate: {
+            value: demo.expirationDate,
+            confidence: 0.92,
+            source: 'Demo',
+          },
+          notes: {
+            value: `${demo.notes} Routine advice: ${demo.mockAiEnrichment.routineAdvice}`,
+            confidence: 0.92,
+            source: 'Demo',
+          },
+          ingredients: {
+            value: demo.mockAiEnrichment.ingredientsSummary,
+            confidence: 0.92,
+            source: 'Demo',
+          },
         },
       });
     }
@@ -112,9 +292,86 @@ export default function ScanScreen() {
   const aiConfigured = isAIServiceConfigured();
   const aiModeAvailable = DEMO_MODE || aiConfigured; // In demo, AI Photo works without backend
   const knownFieldsRef = useRef<Partial<Record<AIFieldKey, string>>>({});
-  const demoProductIndexRef = useRef(0);
   const processingScanRef = useRef(false); // prevent double-handling one scan
+  const aiSessionBarcodeRef = useRef<string | null>(null);
+  const lastAiBarcodeToastRef = useRef<string | null>(null);
   const scanLineAnim = useRef(new Animated.Value(0)).current;
+
+  const resetAiSessionBarcode = () => {
+    aiSessionBarcodeRef.current = null;
+    lastAiBarcodeToastRef.current = null;
+    setAiSessionBarcode(null);
+  };
+
+  const rememberAiSessionBarcode = (raw: string) => {
+    const normalized = raw.replace(/\D/g, '');
+    if (normalized.length < 5) return;
+    if (aiSessionBarcodeRef.current === normalized) return;
+    aiSessionBarcodeRef.current = normalized;
+    setAiSessionBarcode(normalized);
+    if (lastAiBarcodeToastRef.current !== normalized) {
+      lastAiBarcodeToastRef.current = normalized;
+      showToast('Barcode captured — we will use it if the photo match needs help', 'info');
+    }
+  };
+
+  const resolveDemoViaBarcode = async (barcode: string): Promise<DemoProductInput | null> => {
+    const localMatch = resolveDemoProductByBarcode(barcode);
+    if (localMatch.product) {
+      return localMatch.product;
+    }
+
+    try {
+      const lookup = await Promise.race([
+        lookupProductByBarcode(barcode),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('Demo barcode timeout')), DEMO_BARCODE_BACKEND_TIMEOUT_MS)
+        ),
+      ]);
+      const backendDemoProduct = (lookup.data as { demoProduct?: DemoProductInput } | undefined)
+        ?.demoProduct;
+      if (lookup.success && backendDemoProduct) {
+        return backendDemoProduct;
+      }
+    } catch {
+      // Backend barcode lookup is best-effort during AI photo.
+    }
+
+    return null;
+  };
+
+  const toDemoMatchFromProduct = (
+    product: DemoProductInput,
+    matchedBy: DemoMatchResult['matchedBy'],
+    cue: string
+  ): DemoMatchResult => ({
+    product,
+    matchedBy,
+    score: 100,
+    matchedCues: [cue],
+  });
+
+  const primeKnownFieldsFromDemo = (demo: DemoProductInput) => {
+    knownFieldsRef.current = {
+      name: demo.name,
+      brand: demo.brand,
+      category: demo.category,
+      ingredients: demo.mockAiEnrichment.ingredientsSummary,
+    };
+  };
+
+  const getPostBarcodeProductLabel = (): string | null => {
+    if (!postBarcodeCapture) return null;
+    if (postBarcodeCapture.kind === 'demo') {
+      return formatDemoProductLabel(postBarcodeCapture.product);
+    }
+    const name = knownFieldsRef.current.name;
+    if (name) {
+      const brand = knownFieldsRef.current.brand;
+      return brand ? `${brand} · ${name}` : name;
+    }
+    return 'your product';
+  };
 
   useEffect(() => {
     if (permission?.granted) {
@@ -161,6 +418,19 @@ export default function ScanScreen() {
     };
   }, []);
 
+  const handleCameraBarcodeDetected = (result: BarcodeScanningResult) => {
+    if (postBarcodeCapture || isAnalyzing) return;
+
+    if (scanMode === 'ai' && isScanning) {
+      rememberAiSessionBarcode(result.data);
+      return;
+    }
+
+    if (scanMode === 'barcode' && !scanned && !processingScanRef.current) {
+      handleBarCodeScanned(result);
+    }
+  };
+
   const handleBarCodeScanned = async ({ type, data }: BarcodeScanningResult) => {
     if (scanned || processingScanRef.current) return;
 
@@ -182,19 +452,44 @@ export default function ScanScreen() {
 
       if (DEMO_MODE) {
         setIsAddingDemo(true);
-        // Simulate barcode lookup so the app doesn't feel instant
-        const THINKING_MS = 1800;
+        const THINKING_MS = 900;
         await new Promise((r) => setTimeout(r, THINKING_MS));
-        const idx = demoProductIndexRef.current % DEMO_PRODUCTS.length;
-        demoProductIndexRef.current += 1;
-        const demo = DEMO_PRODUCTS[idx];
+
+        let demoProduct: DemoProductInput | null = null;
+
+        try {
+          const lookup = await Promise.race([
+            lookupProductByBarcode(barcodeValue),
+            new Promise<never>((_, reject) =>
+              setTimeout(() => reject(new Error('Demo barcode timeout')), DEMO_BARCODE_BACKEND_TIMEOUT_MS)
+            ),
+          ]);
+
+          const backendDemoProduct = (lookup.data as { demoProduct?: DemoProductInput } | undefined)
+            ?.demoProduct;
+
+          if (lookup.success && backendDemoProduct) {
+            demoProduct = backendDemoProduct;
+          }
+        } catch {
+          // Fall back to the local demo resolver if the backend is unavailable.
+        }
+
+        if (!demoProduct) {
+          demoProduct = resolveDemoProductByBarcode(barcodeValue).product;
+        }
+
         setIsAddingDemo(false);
         setScanned(false);
         processingScanRef.current = false;
-        await saveDemoAndShowDetail(demo, {
-          barcode: barcodeValue,
-          photoUri: demo.demoPhotoUri,
-        });
+        if (demoProduct) {
+          primeKnownFieldsFromDemo(demoProduct);
+          showToast(`Found: ${formatDemoProductLabel(demoProduct)}`, 'success');
+          beginPostBarcodePhotoFlow(demoProduct, barcodeValue);
+        } else {
+          showToast("We couldn't confirm this automatically yet.", 'info');
+          openPresenterPicker({ barcode: barcodeValue, source: 'barcode' });
+        }
         return;
       }
 
@@ -231,7 +526,7 @@ export default function ScanScreen() {
         showToast(errorMessage, 'error');
       }
 
-      openAddProduct({
+      beginAddProductPhotoFlow({
         barcode: barcodeValue,
         upcData,
         scanNotFound: !lookup.success || !lookup.data,
@@ -289,6 +584,7 @@ export default function ScanScreen() {
       return;
     }
 
+    resetAiSessionBarcode();
     setIsScanning(true);
     setScanned(false);
     setCameraReady(false); // Reset camera ready state when starting scan
@@ -299,6 +595,7 @@ export default function ScanScreen() {
       setIsScanning(false);
       setScanned(false);
     }
+    resetAiSessionBarcode();
     setScanMode(scanMode === 'barcode' ? 'ai' : 'barcode');
   };
 
@@ -309,6 +606,41 @@ export default function ScanScreen() {
   const toggleFlashlight = () => {
     if (cameraRef.current) {
       setFlashlightEnabled(!flashlightEnabled);
+    }
+  };
+
+  const handlePostBarcodePhotoCapture = async () => {
+    if (!cameraRef.current || isAnalyzing || !cameraReady) {
+      if (!cameraReady) {
+        showToast('Camera not ready. Please wait...', 'error');
+      }
+      return;
+    }
+
+    try {
+      setIsAnalyzing(true);
+      const photo = await cameraRef.current.takePictureAsync({
+        quality: 0.8,
+        base64: false,
+        skipProcessing: false,
+      });
+      if (!photo?.uri) {
+        throw new Error('Failed to capture photo');
+      }
+      if (Platform.OS === 'ios' || Platform.OS === 'android') {
+        try {
+          Vibration.vibrate(VIBRATION_PATTERN);
+        } catch {
+          // ignore
+        }
+      }
+      showToast('Photo saved with product', 'success');
+      await finishPostBarcodePhotoStep(photo.uri);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Failed to capture photo';
+      showToast(message, 'error');
+    } finally {
+      setIsAnalyzing(false);
     }
   };
 
@@ -357,27 +689,153 @@ export default function ScanScreen() {
             // ignore
           }
         }
-        // Simulate "analyzing" briefly so the flow feels real
-        await new Promise((r) => setTimeout(r, 1200));
-        const idx = demoProductIndexRef.current % DEMO_PRODUCTS.length;
-        demoProductIndexRef.current += 1;
-        const demo = DEMO_PRODUCTS[idx];
+        showToast('Identifying product...', 'info');
         setIsScanning(false);
+        const sourceFields: Partial<AIFieldMap> = {};
+        let lastExtractedFields: Partial<AIFieldMap> | null = null;
+        if (knownFieldsRef.current.name) {
+          sourceFields.name = {
+            value: knownFieldsRef.current.name,
+            confidence: 0.88,
+            source: 'Known field',
+          };
+        }
+        if (knownFieldsRef.current.brand) {
+          sourceFields.brand = {
+            value: knownFieldsRef.current.brand,
+            confidence: 0.88,
+            source: 'Known field',
+          };
+        }
+        if (knownFieldsRef.current.category) {
+          sourceFields.category = {
+            value: knownFieldsRef.current.category,
+            confidence: 0.8,
+            source: 'Known field',
+          };
+        }
+        if (knownFieldsRef.current.ingredients) {
+          sourceFields.ingredients = {
+            value: knownFieldsRef.current.ingredients,
+            confidence: 0.78,
+            source: 'Known field',
+          };
+        }
+
+        const barcodeHint = aiSessionBarcodeRef.current;
+        let resolved = resolveDemoProductByAiFields(
+          Object.keys(sourceFields).length ? sourceFields : undefined,
+          knownFieldsRef.current
+        );
+
+        if (!resolved.product && barcodeHint) {
+          const viaBarcode = await resolveDemoViaBarcode(barcodeHint);
+          if (viaBarcode) {
+            resolved = toDemoMatchFromProduct(viaBarcode, 'barcode', barcodeHint);
+            primeKnownFieldsFromDemo(viaBarcode);
+          }
+        }
+
+        if (photo?.uri && aiConfigured) {
+          try {
+            const backendResolution = await Promise.race([
+              resolveDemoProductImage(photo.uri, knownFieldsRef.current, barcodeHint ?? undefined),
+              new Promise<never>((_, reject) =>
+                setTimeout(() => reject(new Error('Demo AI timeout')), DEMO_AI_BACKEND_TIMEOUT_MS)
+              ),
+            ]);
+
+            if (backendResolution.extractedFields) {
+              lastExtractedFields = backendResolution.extractedFields;
+            }
+
+            if (backendResolution.success && backendResolution.matched && backendResolution.product) {
+              resolved = {
+                product: backendResolution.product,
+                score: backendResolution.confidence ?? 0,
+                matchedCues: backendResolution.matchedCues ?? [],
+                matchedBy: 'ocr-hints',
+              };
+              primeKnownFieldsFromDemo(backendResolution.product);
+            } else if (backendResolution.success && backendResolution.extractedFields) {
+              resolved = resolveDemoProductByAiFields(
+                backendResolution.extractedFields,
+                knownFieldsRef.current
+              );
+            } else if (!backendResolution.success && backendResolution.error) {
+              showToast(backendResolution.error, 'error');
+            }
+          } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : 'Photo match unavailable';
+            if (message.includes('timeout')) {
+              showToast('Photo check is taking longer than usual…', 'info');
+            }
+          }
+        } else if (!photo?.uri) {
+          showToast('Photo capture was slow. Try again or pick from the list.', 'info');
+        }
+
+        if (!resolved.product && barcodeHint) {
+          const viaBarcode = await resolveDemoViaBarcode(barcodeHint);
+          if (viaBarcode) {
+            resolved = toDemoMatchFromProduct(viaBarcode, 'barcode', barcodeHint);
+            primeKnownFieldsFromDemo(viaBarcode);
+          }
+        }
+
         setIsAnalyzing(false);
         setScanned(false);
-        await saveDemoAndShowDetail(demo, {
-          photoUri: photo?.uri ?? demo.demoPhotoUri,
-        });
+        resetAiSessionBarcode();
+
+        if (resolved.product) {
+          const matchLabel =
+            resolved.matchedBy === 'barcode'
+              ? `Found via barcode: ${formatDemoProductLabel(resolved.product)}`
+              : `Found: ${formatDemoProductLabel(resolved.product)}`;
+          showToast(matchLabel, 'success');
+          await saveDemoAndShowDetail(resolved.product, {
+            photoUri: photo?.uri,
+            barcode: barcodeHint ?? resolved.product.barcode,
+          });
+        } else {
+          const detectedSummary =
+            formatDetectionSummary(lastExtractedFields) ??
+            formatDetectionSummary(
+              Object.keys(sourceFields).length ? sourceFields : undefined
+            );
+          if (detectedSummary) {
+            showToast(`Read: ${detectedSummary}. Pick the closest match.`, 'info');
+          } else if (barcodeHint) {
+            showToast(`Barcode ${barcodeHint} did not match our demo catalog.`, 'info');
+          } else {
+            showToast("We couldn't identify this product yet.", 'info');
+          }
+          openPresenterPicker({
+            photoUri: photo?.uri,
+            source: 'ai',
+            barcode: barcodeHint ?? undefined,
+            detectedSummary: detectedSummary ?? undefined,
+          });
+        }
         return;
       }
 
       if (!photo?.uri) throw new Error('Failed to capture photo');
       const capturedPhotoUri = photo.uri;
+      const barcodeHint = aiSessionBarcodeRef.current;
 
       showToast('Capturing and analyzing image...', 'info');
       const analysisResult = await analyzeProductImage(capturedPhotoUri, knownFieldsRef.current);
 
       if (!analysisResult.success || !analysisResult.fields) {
+        if (barcodeHint) {
+          setIsAnalyzing(false);
+          setIsScanning(false);
+          resetAiSessionBarcode();
+          showToast('Photo analysis failed — using barcode instead.', 'info');
+          beginAddProductPhotoFlow({ barcode: barcodeHint, scanNotFound: true });
+          return;
+        }
         throw new Error(analysisResult.error || 'Failed to analyze image');
       }
 
@@ -390,12 +848,14 @@ export default function ScanScreen() {
       }
       setIsScanning(false);
 
+      resetAiSessionBarcode();
       setTimeout(() => {
         showToast('Product analyzed! Filling form...', 'success');
         openAddProduct({
           aiData: analysisResult.fields,
           aiFlatData: analysisResult.flatData,
           photoUri: capturedPhotoUri,
+          barcode: barcodeHint ?? undefined,
         });
         setIsAnalyzing(false);
         setScanned(false);
@@ -477,6 +937,46 @@ export default function ScanScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      <Modal
+        visible={presenterPickerVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={closePresenterPicker}
+      >
+        <View style={styles.presenterModalBackdrop}>
+          <View style={styles.presenterModalCard}>
+            <Text style={styles.presenterModalEyebrow}>Demo products</Text>
+            <Text style={styles.presenterModalTitle}>Choose demo product</Text>
+            <Text style={styles.presenterModalCopy}>{presenterPickerCopy}</Text>
+            <ScrollView
+              style={styles.presenterList}
+              contentContainerStyle={styles.presenterListContent}
+              showsVerticalScrollIndicator={false}
+            >
+              {DEMO_PRODUCTS.map((product) => (
+                <TouchableOpacity
+                  key={product.id}
+                  style={styles.presenterItem}
+                  onPress={() => handlePresenterSelect(product.id)}
+                  activeOpacity={0.8}
+                >
+                  <View style={styles.presenterItemContent}>
+                    <Text style={styles.presenterItemBrand}>{product.brand}</Text>
+                    <Text style={styles.presenterItemName}>{product.name}</Text>
+                    <Text style={styles.presenterItemMeta}>
+                      {product.volume} • {product.matcherHints.packagingColor}
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <TouchableOpacity style={styles.presenterCloseButton} onPress={closePresenterPicker}>
+              <Text style={styles.presenterCloseButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
       {DEMO_MODE && (
         <View style={styles.demoBadge}>
           <Text style={styles.demoBadgeText}>Demo mode</Text>
@@ -495,23 +995,12 @@ export default function ScanScreen() {
             style={styles.camera}
             facing="back"
             enableTorch={flashlightEnabled}
-            onBarcodeScanned={scanMode === 'barcode' && !scanned ? handleBarCodeScanned : undefined}
+            onBarcodeScanned={
+              isScanning && !postBarcodeCapture ? handleCameraBarcodeDetected : undefined
+            }
             barcodeScannerSettings={
-              scanMode === 'barcode'
-                ? {
-                    barcodeTypes: [
-                      'ean13',
-                      'ean8',
-                      'upc_a',
-                      'upc_e',
-                      'code128',
-                      'code39',
-                      'code93',
-                      'codabar',
-                      'itf14',
-                      'qr',
-                    ],
-                  }
+              isScanning && (scanMode === 'barcode' || scanMode === 'ai')
+                ? { barcodeTypes: [...BARCODE_SCAN_TYPES] }
                 : undefined
             }
             onMountError={(error) => {
@@ -539,7 +1028,17 @@ export default function ScanScreen() {
                 />
               </TouchableOpacity>
 
-              {scanMode === 'barcode' && !scanned && (
+              {postBarcodeCapture && (
+                <View style={styles.instructionChipTop} pointerEvents="none">
+                  <Text style={styles.instructionChipText}>
+                    {getPostBarcodeProductLabel()
+                      ? `Barcode matched: ${getPostBarcodeProductLabel()}`
+                      : 'Barcode scanned'}
+                  </Text>
+                </View>
+              )}
+
+              {scanMode === 'barcode' && !scanned && !postBarcodeCapture && (
                 <View style={styles.instructionChipTop} pointerEvents="none">
                   <Text style={styles.instructionChipText}>
                     Align the barcode on the flat side of the package.
@@ -579,9 +1078,42 @@ export default function ScanScreen() {
                 </View>
               )}
 
-              {/* AI Mode - Capture button */}
-              {scanMode === 'ai' && !isAnalyzing && (
+              {/* Post-barcode product photo */}
+              {postBarcodeCapture && !isAnalyzing && (
                 <View style={styles.aiCaptureContainer}>
+                  <TouchableOpacity
+                    style={[styles.captureButton, !cameraReady && styles.captureButtonDisabled]}
+                    onPress={handlePostBarcodePhotoCapture}
+                    activeOpacity={0.8}
+                    disabled={!cameraReady}
+                  >
+                    <View style={styles.captureButtonInner} />
+                  </TouchableOpacity>
+                  <Text style={styles.captureHintText}>
+                    {cameraReady
+                      ? 'Frame the product, then tap to save its photo'
+                      : 'Waiting for camera...'}
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.skipPhotoButton}
+                    onPress={() => finishPostBarcodePhotoStep()}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.skipPhotoButtonText}>Skip for now</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {/* AI Mode - Capture button */}
+              {!postBarcodeCapture && scanMode === 'ai' && !isAnalyzing && (
+                <View style={styles.aiCaptureContainer}>
+                  {aiSessionBarcode ? (
+                    <View style={styles.aiBarcodeChip} pointerEvents="none">
+                      <Text style={styles.aiBarcodeChipText}>
+                        Barcode ready: {aiSessionBarcode}
+                      </Text>
+                    </View>
+                  ) : null}
                   <TouchableOpacity
                     style={[styles.captureButton, !cameraReady && styles.captureButtonDisabled]}
                     onPress={handleCapturePhoto}
@@ -592,7 +1124,7 @@ export default function ScanScreen() {
                   </TouchableOpacity>
                   <Text style={styles.captureHintText}>
                     {cameraReady
-                      ? 'Fill the frame with the product name and size, then tap to capture'
+                      ? 'Include the label; barcode on the side is detected automatically'
                       : 'Waiting for camera...'}
                   </Text>
                 </View>
@@ -602,7 +1134,7 @@ export default function ScanScreen() {
               {isAnalyzing && (
                 <View style={styles.analyzingContainer}>
                   <ActivityIndicator size="large" color={colors.white} />
-                  <Text style={styles.analyzingText}>Analyzing product...</Text>
+                  <Text style={styles.analyzingText}>Identifying product...</Text>
                 </View>
               )}
             </View>
@@ -614,7 +1146,9 @@ export default function ScanScreen() {
             </View>
             <Text style={styles.idleHeadline}>Add a product in seconds</Text>
             <Text style={styles.idleSubcopy}>
-              Use barcode for boxed items, or AI photo for labels and curved packaging.
+              {DEMO_MODE
+                ? 'Try scanning the barcode or product label on one of the demo products provided.'
+                : 'Use barcode for boxed items, or AI photo for labels and curved packaging.'}
             </Text>
             <View style={styles.tipsWrap}>
               {IDLE_TIPS.map((tip) => (
@@ -637,7 +1171,7 @@ export default function ScanScreen() {
                 toggleScanMode();
               }
             }}
-            disabled={isScanning}
+            disabled={isScanning || !!postBarcodeCapture}
           >
             <Ionicons
               name="barcode-outline"
@@ -667,7 +1201,7 @@ export default function ScanScreen() {
                 showToast('AI service not configured. Please set API key.', 'error');
               }
             }}
-            disabled={isScanning || !aiModeAvailable}
+            disabled={isScanning || !aiModeAvailable || !!postBarcodeCapture}
           >
             <Ionicons
               name="sparkles-outline"
@@ -716,6 +1250,18 @@ export default function ScanScreen() {
           )}
         </TouchableOpacity>
 
+        {DEMO_MODE && (
+          <TouchableOpacity
+            style={styles.demoChooserButton}
+            onPress={() => openPresenterPicker({ source: 'chooser' })}
+            activeOpacity={0.8}
+            testID="choose-demo-product-button"
+          >
+            <Ionicons name="sparkles-outline" size={18} color={colors.primary} />
+            <Text style={styles.demoChooserButtonText}>Choose from demo products</Text>
+          </TouchableOpacity>
+        )}
+
         <TouchableOpacity
           style={styles.manualEntryLink}
           onPress={handleManualEntry}
@@ -749,6 +1295,84 @@ const styles = StyleSheet.create({
     ...typography.caption,
     fontWeight: '600',
     color: colors.primary,
+  },
+  presenterModalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.lg,
+  },
+  presenterModalCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.xl,
+    padding: spacing.lg,
+    maxHeight: '75%',
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+  },
+  presenterModalEyebrow: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  presenterModalTitle: {
+    ...typography.cardTitle,
+    color: colors.textPrimary,
+    marginTop: spacing.xs,
+  },
+  presenterModalCopy: {
+    ...typography.body,
+    color: colors.textSecondary,
+    marginTop: spacing.xs,
+    lineHeight: 20,
+  },
+  presenterList: {
+    marginTop: spacing.md,
+  },
+  presenterListContent: {
+    gap: spacing.sm,
+  },
+  presenterItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.lg,
+    backgroundColor: colors.cream,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+  },
+  presenterItemContent: {
+    flex: 1,
+    paddingRight: spacing.sm,
+  },
+  presenterItemBrand: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  presenterItemName: {
+    ...typography.bodyLargeStrong,
+    color: colors.textPrimary,
+    marginTop: 2,
+  },
+  presenterItemMeta: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    marginTop: 4,
+  },
+  presenterCloseButton: {
+    marginTop: spacing.md,
+    alignSelf: 'flex-end',
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+  },
+  presenterCloseButtonText: {
+    ...typography.bodyStrong,
+    color: colors.link,
   },
   thinkingOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -945,6 +1569,31 @@ const styles = StyleSheet.create({
     borderRadius: radius.full,
     maxWidth: width * 0.9,
   },
+  skipPhotoButton: {
+    marginTop: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.full,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.35)',
+  },
+  skipPhotoButtonText: {
+    color: colors.white,
+    ...typography.bodyStrong,
+  },
+  aiBarcodeChip: {
+    marginBottom: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.full,
+    backgroundColor: 'rgba(16, 185, 129, 0.85)',
+  },
+  aiBarcodeChipText: {
+    color: colors.white,
+    ...typography.caption,
+    fontWeight: '600',
+  },
   analyzingContainer: {
     position: 'absolute',
     bottom: spacing.xxl,
@@ -1084,6 +1733,23 @@ const styles = StyleSheet.create({
   scanButtonText: {
     ...typography.subtitle,
     color: colors.white,
+  },
+  demoChooserButton: {
+    marginTop: spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    borderRadius: radius.full,
+    borderWidth: 1,
+    borderColor: colors.primaryLight,
+    backgroundColor: colors.surface,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+  },
+  demoChooserButtonText: {
+    ...typography.bodyStrong,
+    color: colors.primary,
   },
   manualEntryLink: {
     marginTop: spacing.md,

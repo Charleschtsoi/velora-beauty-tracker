@@ -15,6 +15,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { useProducts } from '../context/ProductContext';
 import { ProductCategory } from '../types/product.types';
+import { DEMO_MODE } from '../config/demoMode';
 import PhotoUploader from '../components/common/PhotoUploader';
 import DatePickerField from '../components/common/DatePickerField';
 import DropdownSelect from '../components/common/DropdownSelect';
@@ -69,6 +70,7 @@ const initialFieldSources: Record<AIFieldKey, FieldSourceInfo> = {
   name: null,
   brand: null,
   category: null,
+  packagingColor: null,
   expirationDate: null,
   ingredients: null,
   notes: null,
@@ -139,6 +141,9 @@ export default function AddProductScreen() {
             break;
           case 'category':
             setCategory(mapAICategoryToEnum(value));
+            break;
+          case 'packagingColor':
+            // Demo resolver uses this signal; no dedicated form field is needed.
             break;
           case 'expirationDate':
             try {
@@ -328,7 +333,9 @@ export default function AddProductScreen() {
           <View style={styles.scanNotFoundBanner}>
             <Ionicons name="information-circle" size={20} color="#10b981" />
             <Text style={styles.scanNotFoundBannerText}>
-              We couldn't find this product. You can edit the fields below or try another photo.
+              {DEMO_MODE
+                ? "We couldn't confirm this demo product automatically. You can edit the details below or try scanning again."
+                : "We couldn't find this product. You can edit the fields below or try another photo."}
             </Text>
             <TouchableOpacity
               onPress={() => setShowScanNotFoundBanner(false)}
@@ -355,7 +362,9 @@ export default function AddProductScreen() {
           <View style={styles.aiIndicator}>
             <Ionicons name="sparkles" size={20} color="#10b981" />
             <Text style={styles.aiIndicatorText}>
-              AI-extracted data • Please review and edit as needed
+              {DEMO_MODE
+                ? 'Demo scan pre-filled the details it could confirm.'
+                : 'AI-extracted data • Please review and edit as needed'}
             </Text>
           </View>
         )}
