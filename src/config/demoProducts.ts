@@ -96,14 +96,15 @@ export const DEMO_PRODUCTS: DemoProductInput[] = [
     brand: 'CHANEL',
     category: 'sunscreen',
     volume: '30ml',
+    productionDate: '2025-03-01',
     expirationDate: '2026-12-31',
     notes:
-      'Global protection formula enriched with ginger from Madagascar; made in France.',
+      'Global protection formula enriched with ginger from Madagascar; made in France. Batch code: 1502. Manufactured: March 2025.',
     demoPhotoUri: "require('../assets/demo/chanel_uv_essentiel.jpg')",
     barcode: '3145891418989',
     matcherHints: {
       primaryOcrCues: ['CHANEL', 'UV ESSENTIEL', 'SPF 50+'],
-      secondaryOcrCues: ['PROTECTION GLOBALE', 'GLOBAL PROTECTION', '30 ml'],
+      secondaryOcrCues: ['PROTECTION GLOBALE', 'GLOBAL PROTECTION', '30 ml', '1502'],
       packagingColor: 'white-silver',
     },
     mockAiEnrichment: {
@@ -180,6 +181,29 @@ export const DEMO_PRODUCTS: DemoProductInput[] = [
         'A lightweight hydrating emulsion centered on multiple forms of hyaluronic acid to replenish surface moisture, soften skin, and support a smoother barrier.',
       routineAdvice:
         'Apply after toner and serum, then smooth 1 to 2 pumps across the face as your lightweight moisturizing step morning and night.',
+    },
+  },
+  {
+    id: 'demo_006_neutrogena_hydro_boost_water_gel_50g',
+    name: 'Hydro Boost Hyaluronic Acid Water Gel',
+    brand: 'Neutrogena',
+    category: 'skincare',
+    volume: '50g',
+    productionDate: '2026-01-21',
+    expirationDate: '2029-01-20',
+    notes:
+      'Refillable Hydro Boost water gel jar for AM/PM use. Compatible with Hydro Boost refill pods only. Batch lot: 004. Label code: 128870.',
+    demoPhotoUri: "require('../assets/demo/neutrogena_hydro_boost_water_gel_50g.jpg')",
+    matcherHints: {
+      primaryOcrCues: ['Neutrogena', 'HYDRO BOOST', 'WATER GEL', 'HYALURONIC ACID'],
+      secondaryOcrCues: ['50g', '004', '128870', 'Refillable'],
+      packagingColor: 'translucent-blue',
+    },
+    mockAiEnrichment: {
+      ingredientsSummary:
+        'A lightweight gel moisturizer with hyaluronic acid and humectants that helps attract water, support hydration, and leave skin feeling refreshed.',
+      routineAdvice:
+        'Apply to clean skin morning and night after toner or serum, then seal with sunscreen in the daytime.',
     },
   },
 ];

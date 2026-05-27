@@ -591,12 +591,14 @@ export default function ScanScreen() {
   };
 
   const toggleScanMode = () => {
-    if (isScanning) {
-      setIsScanning(false);
-      setScanned(false);
+    setScanned(false);
+    processingScanRef.current = false;
+    const nextMode = scanMode === 'barcode' ? 'ai' : 'barcode';
+    // Leaving AI: clear any in-frame barcode chip so Barcode mode starts clean.
+    if (scanMode === 'ai' && nextMode === 'barcode') {
+      resetAiSessionBarcode();
     }
-    resetAiSessionBarcode();
-    setScanMode(scanMode === 'barcode' ? 'ai' : 'barcode');
+    setScanMode(nextMode);
   };
 
   const handleManualEntry = () => {
@@ -1041,7 +1043,8 @@ export default function ScanScreen() {
               {scanMode === 'barcode' && !scanned && !postBarcodeCapture && (
                 <View style={styles.instructionChipTop} pointerEvents="none">
                   <Text style={styles.instructionChipText}>
-                    Align the barcode on the flat side of the package.
+                    Line up the barcode on a flat side; keep the product name in view when you
+                    can—it helps if the scan needs a second look.
                   </Text>
                 </View>
               )}
@@ -1074,7 +1077,10 @@ export default function ScanScreen() {
 
               {!scanned && scanMode === 'barcode' && (
                 <View style={styles.scanningIndicator}>
-                  <Text style={styles.scanningText}>Hold steady — glossy labels may need the torch</Text>
+                  <Text style={styles.scanningText}>
+                    Hold steady—glossy labels may need the torch. Show barcode and product name
+                    when both fit in frame.
+                  </Text>
                 </View>
               )}
 
@@ -1091,7 +1097,7 @@ export default function ScanScreen() {
                   </TouchableOpacity>
                   <Text style={styles.captureHintText}>
                     {cameraReady
-                      ? 'Frame the product, then tap to save its photo'
+                      ? 'Frame the label with the product name clear, then tap to save. Include the barcode when you can.'
                       : 'Waiting for camera...'}
                   </Text>
                   <TouchableOpacity
@@ -1124,7 +1130,7 @@ export default function ScanScreen() {
                   </TouchableOpacity>
                   <Text style={styles.captureHintText}>
                     {cameraReady
-                      ? 'Include the label; barcode on the side is detected automatically'
+                      ? 'Include the label with the product name readable; add the barcode in frame when possible—both help the AI. Side barcodes are read automatically.'
                       : 'Waiting for camera...'}
                   </Text>
                 </View>
@@ -1171,7 +1177,7 @@ export default function ScanScreen() {
                 toggleScanMode();
               }
             }}
-            disabled={isScanning || !!postBarcodeCapture}
+            disabled={isAnalyzing || !!postBarcodeCapture}
           >
             <Ionicons
               name="barcode-outline"
@@ -1201,7 +1207,7 @@ export default function ScanScreen() {
                 showToast('AI service not configured. Please set API key.', 'error');
               }
             }}
-            disabled={isScanning || !aiModeAvailable || !!postBarcodeCapture}
+            disabled={isAnalyzing || !aiModeAvailable || !!postBarcodeCapture}
           >
             <Ionicons
               name="sparkles-outline"

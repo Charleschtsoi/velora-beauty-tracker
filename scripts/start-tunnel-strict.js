@@ -41,10 +41,40 @@ function getEnvInt(name, fallback) {
   return Number.isFinite(n) ? n : fallback;
 }
 
+/**
+ * True if something is already accepting TCP connections on this port (e.g. Metro).
+ * We probe connect() on both IPv4 and IPv6 loopback — a bind-only check on 127.0.0.1
+ * can miss a server listening only on ::1, which then makes Expo prompt for another
+ * port and fail in non-interactive mode.
+ */
+async function isPortInUse(port) {
+  const probe = (host) =>
+    new Promise((resolve) => {
+      const socket = net.createConnection({ port, host, family: host === "::1" ? 6 : 4 });
+      const timer = setTimeout(() => {
+        socket.destroy();
+        resolve(false);
+      }, 400);
+      socket.once("connect", () => {
+        clearTimeout(timer);
+        socket.destroy();
+        resolve(true);
+      });
+      socket.once("error", () => {
+        clearTimeout(timer);
+        resolve(false);
+      });
+    });
+
+  if (await probe("127.0.0.1")) return true;
+  if (await probe("::1")) return true;
+  return false;
+}
+
 async function isPortAvailable(port) {
+  if (await isPortInUse(port)) return false;
   return new Promise((resolve) => {
     const server = net.createServer();
-    // We only care about bind success; immediately release it.
     server.unref();
     server.on("error", () => resolve(false));
     server.listen(port, "127.0.0.1", () => {
