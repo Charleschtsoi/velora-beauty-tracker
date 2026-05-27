@@ -55,6 +55,13 @@ export const colors = {
   destructive: '#8B3A3A',
   white: '#FFFFFF',
   black: '#000000',
+
+  /** Live camera overlay: frosted charcoal (readable on video, on-brand vs flat black) */
+  overlayPillBg: 'rgba(26, 26, 26, 0.78)',
+  overlayPillBorder: 'rgba(255, 255, 255, 0.12)',
+  overlayPillSubtitle: 'rgba(255, 255, 255, 0.78)',
+  overlayMuted: 'rgba(26, 26, 26, 0.5)',
+  overlayButton: 'rgba(26, 26, 26, 0.55)',
 } as const;
 
 export type ColorKey = keyof typeof colors;

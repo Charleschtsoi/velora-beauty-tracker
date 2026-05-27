@@ -45,17 +45,13 @@ import {
 } from '../services/demoScanResolver';
 import { onProductSaved } from '../services/localNotificationService';
 import { colors, spacing, radius, shadow, typography } from '../theme';
+import { scanCameraCopy, truncateBarcodeForDisplay } from '../copy/scanCamera';
+import { ScanCameraHint } from '../components/scan/ScanCameraHint';
 
 const { width, height } = Dimensions.get('window');
 /** Portrait-leaning frame: better for tubes, bottles, vertical labels */
 const SCAN_FRAME_WIDTH = width * 0.72;
 const SCAN_FRAME_HEIGHT = Math.min(width * 0.5, height * 0.36);
-
-const IDLE_TIPS = [
-  'Flat surface works best',
-  'Try torch in dim light',
-  'No barcode? Use AI photo',
-] as const;
 
 // Vibration pattern for successful scan
 const VIBRATION_PATTERN = 100;
@@ -1032,20 +1028,25 @@ export default function ScanScreen() {
 
               {postBarcodeCapture && (
                 <View style={styles.instructionChipTop} pointerEvents="none">
-                  <Text style={styles.instructionChipText}>
-                    {getPostBarcodeProductLabel()
-                      ? `Barcode matched: ${getPostBarcodeProductLabel()}`
-                      : 'Barcode scanned'}
-                  </Text>
+                  <ScanCameraHint
+                    compact
+                    maxWidthFactor={0.92}
+                    title={
+                      getPostBarcodeProductLabel()
+                        ? `${scanCameraCopy.postBarcodeMatchedPrefix} — ${getPostBarcodeProductLabel()}`
+                        : scanCameraCopy.postBarcodeScannedFallback
+                    }
+                  />
                 </View>
               )}
 
               {scanMode === 'barcode' && !scanned && !postBarcodeCapture && (
                 <View style={styles.instructionChipTop} pointerEvents="none">
-                  <Text style={styles.instructionChipText}>
-                    Line up the barcode on a flat side; keep the product name in view when you
-                    can—it helps if the scan needs a second look.
-                  </Text>
+                  <ScanCameraHint
+                    compact
+                    maxWidthFactor={0.92}
+                    title={scanCameraCopy.barcodeInstructionTop}
+                  />
                 </View>
               )}
 
@@ -1077,10 +1078,10 @@ export default function ScanScreen() {
 
               {!scanned && scanMode === 'barcode' && (
                 <View style={styles.scanningIndicator}>
-                  <Text style={styles.scanningText}>
-                    Hold steady—glossy labels may need the torch. Show barcode and product name
-                    when both fit in frame.
-                  </Text>
+                  <ScanCameraHint
+                    maxWidthFactor={0.92}
+                    title={scanCameraCopy.barcodeScanningSecondary}
+                  />
                 </View>
               )}
 
@@ -1095,17 +1096,22 @@ export default function ScanScreen() {
                   >
                     <View style={styles.captureButtonInner} />
                   </TouchableOpacity>
-                  <Text style={styles.captureHintText}>
-                    {cameraReady
-                      ? 'Frame the label with the product name clear, then tap to save. Include the barcode when you can.'
-                      : 'Waiting for camera...'}
-                  </Text>
+                  <View style={styles.captureHintBelowShutter}>
+                    {cameraReady ? (
+                      <ScanCameraHint
+                        title={scanCameraCopy.postBarcodeCaptureTitle}
+                        subtitle={scanCameraCopy.postBarcodeCaptureSubtitle}
+                      />
+                    ) : (
+                      <ScanCameraHint title={scanCameraCopy.cameraWaiting} compact />
+                    )}
+                  </View>
                   <TouchableOpacity
                     style={styles.skipPhotoButton}
                     onPress={() => finishPostBarcodePhotoStep()}
                     activeOpacity={0.8}
                   >
-                    <Text style={styles.skipPhotoButtonText}>Skip for now</Text>
+                    <Text style={styles.skipPhotoButtonText}>{scanCameraCopy.skipPhotoForNow}</Text>
                   </TouchableOpacity>
                 </View>
               )}
@@ -1114,10 +1120,12 @@ export default function ScanScreen() {
               {!postBarcodeCapture && scanMode === 'ai' && !isAnalyzing && (
                 <View style={styles.aiCaptureContainer}>
                   {aiSessionBarcode ? (
-                    <View style={styles.aiBarcodeChip} pointerEvents="none">
-                      <Text style={styles.aiBarcodeChipText}>
-                        Barcode ready: {aiSessionBarcode}
-                      </Text>
+                    <View style={styles.aiBarcodeChipWrap} pointerEvents="none">
+                      <ScanCameraHint
+                        compact
+                        title={scanCameraCopy.sessionBarcodePrefix}
+                        subtitle={truncateBarcodeForDisplay(aiSessionBarcode)}
+                      />
                     </View>
                   ) : null}
                   <TouchableOpacity
@@ -1128,11 +1136,16 @@ export default function ScanScreen() {
                   >
                     <View style={styles.captureButtonInner} />
                   </TouchableOpacity>
-                  <Text style={styles.captureHintText}>
-                    {cameraReady
-                      ? 'Include the label with the product name readable; add the barcode in frame when possible—both help the AI. Side barcodes are read automatically.'
-                      : 'Waiting for camera...'}
-                  </Text>
+                  <View style={styles.captureHintBelowShutter}>
+                    {cameraReady ? (
+                      <ScanCameraHint
+                        title={scanCameraCopy.aiCaptureTitle}
+                        subtitle={scanCameraCopy.aiCaptureSubtitle}
+                      />
+                    ) : (
+                      <ScanCameraHint title={scanCameraCopy.cameraWaiting} compact />
+                    )}
+                  </View>
                 </View>
               )}
 
@@ -1140,7 +1153,7 @@ export default function ScanScreen() {
               {isAnalyzing && (
                 <View style={styles.analyzingContainer}>
                   <ActivityIndicator size="large" color={colors.white} />
-                  <Text style={styles.analyzingText}>Identifying product...</Text>
+                  <Text style={styles.analyzingText}>{scanCameraCopy.analyzing}</Text>
                 </View>
               )}
             </View>
@@ -1150,14 +1163,12 @@ export default function ScanScreen() {
             <View style={styles.idleIconWrap}>
               <Ionicons name="camera-outline" size={40} color={colors.primary} />
             </View>
-            <Text style={styles.idleHeadline}>Add a product in seconds</Text>
+            <Text style={styles.idleHeadline}>{scanCameraCopy.idleHeadline}</Text>
             <Text style={styles.idleSubcopy}>
-              {DEMO_MODE
-                ? 'Try scanning the barcode or product label on one of the demo products provided.'
-                : 'Use barcode for boxed items, or AI photo for labels and curved packaging.'}
+              {DEMO_MODE ? scanCameraCopy.idleSubcopyDemo : scanCameraCopy.idleSubcopyLive}
             </Text>
             <View style={styles.tipsWrap}>
-              {IDLE_TIPS.map((tip) => (
+              {scanCameraCopy.idleTips.map((tip) => (
                 <View key={tip} style={styles.tipChip}>
                   <Text style={styles.tipChipText}>{tip}</Text>
                 </View>
@@ -1274,7 +1285,8 @@ export default function ScanScreen() {
           testID="manual-entry-link"
         >
           <Text style={styles.manualEntryText}>
-            Having trouble? <Text style={styles.manualEntryLinkText}>Manual Entry</Text>
+            {scanCameraCopy.manualEntryLead}{' '}
+            <Text style={styles.manualEntryLinkText}>{scanCameraCopy.manualEntryAction}</Text>
           </Text>
         </TouchableOpacity>
       </View>
@@ -1564,51 +1576,37 @@ const styles = StyleSheet.create({
   captureButtonDisabled: {
     opacity: 0.5,
   },
-  captureHintText: {
+  captureHintBelowShutter: {
     marginTop: spacing.sm,
-    color: colors.white,
-    ...typography.bodyStrong,
-    textAlign: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.55)',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderRadius: radius.full,
-    maxWidth: width * 0.9,
+    alignItems: 'center',
+  },
+  aiBarcodeChipWrap: {
+    marginBottom: spacing.sm,
   },
   skipPhotoButton: {
     marginTop: spacing.md,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
     borderRadius: radius.full,
-    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    backgroundColor: colors.overlayButton,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.35)',
+    borderColor: colors.overlayPillBorder,
   },
   skipPhotoButtonText: {
     color: colors.white,
     ...typography.bodyStrong,
-  },
-  aiBarcodeChip: {
-    marginBottom: spacing.sm,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderRadius: radius.full,
-    backgroundColor: 'rgba(16, 185, 129, 0.85)',
-  },
-  aiBarcodeChipText: {
-    color: colors.white,
-    ...typography.caption,
-    fontWeight: '600',
   },
   analyzingContainer: {
     position: 'absolute',
     bottom: spacing.xxl,
     alignItems: 'center',
     alignSelf: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.72)',
+    backgroundColor: colors.overlayPillBg,
+    borderWidth: 1,
+    borderColor: colors.overlayPillBorder,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
   },
   analyzingText: {
     marginTop: spacing.sm,
@@ -1632,17 +1630,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     zIndex: 5,
   },
-  instructionChipText: {
-    ...typography.caption,
-    fontWeight: '600',
-    color: colors.white,
-    textAlign: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderRadius: radius.full,
-    overflow: 'hidden',
-  },
   flashlightButton: {
     position: 'absolute',
     top: spacing.lg,
@@ -1650,7 +1637,9 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    backgroundColor: colors.overlayButton,
+    borderWidth: 1,
+    borderColor: colors.overlayPillBorder,
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 10,
@@ -1708,17 +1697,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: spacing.xxl,
     alignSelf: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.55)',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderRadius: radius.full,
     maxWidth: width * 0.92,
-  },
-  scanningText: {
-    color: colors.white,
-    ...typography.body,
-    fontWeight: '500',
-    textAlign: 'center',
   },
   controlsContainer: {
     paddingHorizontal: spacing.lg,
