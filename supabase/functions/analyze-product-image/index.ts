@@ -4,7 +4,7 @@
 
 const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
 const MAX_IMAGE_SIZE_BYTES = 4 * 1024 * 1024; // 4MB
-const GEMINI_MODEL = "gemini-3.5-flash";
+const GEMINI_MODEL = "gemini-2.0-flash-lite";
 
 const FIELDS = ["name", "brand", "category", "packagingColor", "expirationDate", "ingredients", "notes"] as const;
 
