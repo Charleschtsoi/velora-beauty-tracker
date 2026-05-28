@@ -1,137 +1,130 @@
 # Velora - Beauty Product Expiration Tracker
 
-A React Native Expo app for tracking beauty product expiration dates with barcode scanning, notifications, and category organization.
+Velora is an Expo React Native app for tracking beauty product expiration dates with barcode scanning, AI-assisted label capture, and reminder notifications.
 
-## Features
+## Highlights
 
-- 📱 **Barcode Scanning** - Scan product barcodes or manually enter product details
-- 📊 **Dashboard** - Overview of expiring products, expired items, and total inventory
-- 🔔 **Notifications** - Alerts for products expiring soon or already expired
-- 📁 **Categories** - Organize products by category (Skincare, Makeup, Haircare, etc.)
-- 🔍 **Search & Filter** - Find products quickly with search and filter options
-- 📸 **Photo Upload** - Add product photos for easy identification
-- 🎨 **Modern UI** - Clean, intuitive interface with NativeWind/Tailwind CSS
+- Barcode scan flow with Supabase lookup (`lookup-product` edge function)
+- AI photo flow for label extraction (`analyze-product-image`) with barcode-assisted fallback
+- One-tap camera experience in AI mode (auto-captures post-barcode label photo)
+- Expiration reminders and inventory status (expired / expiring soon / safe)
+- Demo catalog mode for investor/demo walkthroughs
 
 ## Tech Stack
 
-- **React Native** with **Expo SDK 54**
-- **TypeScript** for type safety
-- **React Navigation** for navigation
-- **NativeWind/Tailwind CSS** for styling
-- **Supabase** (configured, using mock data for demo)
-- **Context API** for state management
+- React Native + Expo SDK 54
+- TypeScript
+- React Navigation
+- Supabase (Edge Functions + Postgres)
+- NativeWind/Tailwind
+
+## Requirements
+
+- Node.js 20.19+ (or newer LTS)
+- npm
+- Expo Go (iOS/Android) for physical-device testing
 
 ## Getting Started
 
-### Prerequisites
+1. Clone and install:
 
-- **Node.js** 20.19.x or later
-- **npm** or **yarn** package manager
-- **Expo Go** app on your mobile device (for testing on physical device)
-  - [iOS App Store](https://apps.apple.com/app/expo-go/id982107779)
-  - [Google Play Store](https://play.google.com/store/apps/details?id=host.exp.exponent)
-
-### Installation
-
-1. Clone the repository:
 ```bash
-git clone https://github.com/charleschtsoi/velora-beauty-tracker.git
+git clone https://github.com/Charleschtsoi/velora-beauty-tracker.git
 cd velora-beauty-tracker
-```
-   (If the repo has not been renamed yet, use `hennessy-beauty-tracker` or `hermes-beauty-tracker` in the URL and directory name.)
-
-2. Install dependencies:
-```bash
 npm install
 ```
 
-3. Start the development server:
+2. Configure environment (`.env.local`):
+
+```bash
+EXPO_PUBLIC_SUPABASE_URL=your_supabase_url
+EXPO_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+```
+
+3. Start app:
+
 ```bash
 npm start
 ```
 
-4. Scan the QR code with Expo Go app or press:
-   - `i` for iOS simulator
-   - `a` for Android emulator
-   - `w` for web browser
+## Development Commands
 
-## Project Structure
+- Start (default): `npm start`
+- Start tunnel (strict helper): `npm run start:tunnel`
+- iOS simulator: `npm run ios`
+- Android emulator: `npm run android`
+- Web: `npm run web`
 
-```
-src/
-├── components/      # Reusable UI components
-├── screens/        # App screens
-├── navigation/     # Navigation configuration
-├── context/        # React Context providers
-├── services/       # API and service layers
-├── types/          # TypeScript type definitions
-└── utils/          # Utility functions
-```
+## Supabase Migrations
 
-## Demo Data
+Project includes Supabase migrations under `supabase/migrations` (demo catalog + updates).
 
-The app comes pre-populated with 10 realistic beauty products for demonstration:
-- 2 expired products
-- 3 expiring soon products
-- 5 safe products
+Apply migrations to remote:
 
-## Configuration
-
-### Supabase Setup (Optional)
-
-To use real Supabase backend instead of mock data:
-
-1. Create a `.env` file:
-```
-EXPO_PUBLIC_SUPABASE_URL=your_supabase_url
-EXPO_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
+```bash
+supabase db push --include-all
 ```
 
-2. Update `src/services/productService.ts` to uncomment Supabase queries
+## Scan Experience (Current)
 
-3. Run the database schema SQL in your Supabase project (see `src/services/supabase.ts`)
+- **Barcode mode**: scans barcode and looks up metadata via Supabase edge function.
+- **AI Photo mode**: captures product photo, analyzes label, and merges barcode lookup when available.
+- If barcode is recognized during AI capture, Velora uses it to improve matching and expiry prefill.
+- Post-barcode label capture is now automatic once camera is ready (no extra tap required).
 
-## Development
+## Demo Catalog Notes
 
-- **Start dev server**: `npm start`
-- **iOS**: `npm run ios`
-- **Android**: `npm run android`
-- **Web**: `npm run web`
+Demo products are configured in:
+
+- `src/config/demoProducts.ts`
+- `supabase/migrations/*demo*`
+
+Recent demo updates include Chanel, Hada Labo, and Neutrogena catalog entries (with expiry metadata aligned in Supabase).
 
 ## Troubleshooting
 
-### Common Issues
+### Expo package compatibility warning
 
-**SDK Version Mismatch**
-- If you see "Project is incompatible with this version of Expo Go", ensure you're using Expo SDK 54
-- Run `npx expo install --fix` to align all packages
+If Expo suggests patch updates, run:
 
-**Babel Errors**
-- If you see Babel configuration errors, ensure `babel-preset-expo` is installed
-- Check that `babel.config.js` has the correct NativeWind v4 configuration
+```bash
+npx expo install expo expo-file-system expo-image-picker expo-notifications
+```
 
-**Camera Permissions**
-- On first use, grant camera permissions when prompted
-- If camera doesn't work, use the "Manual Entry" option
+Then restart Metro.
+
+### Tunnel errors (`remote gone away`)
+
+Tunnel uses ngrok and can be intermittent.
+
+- Retry `npx expo start --tunnel`
+- Check https://status.ngrok.com/
+- Try another network/hotspot
+- If phone and Mac are on same Wi-Fi, use LAN (`npm start`) instead
+
+### Camera issues
+
+- Grant camera permission in OS settings
+- Use Manual entry fallback if camera is unavailable
+
+## Project Structure
+
+```text
+src/
+  components/
+  config/
+  context/
+  navigation/
+  screens/
+  services/
+  theme/
+  types/
+  utils/
+supabase/
+  functions/
+  migrations/
+```
 
 ## License
 
-Private project - All rights reserved
-
-## Demo Notes
-
-This is a demo version prepared for presentation. All data is mocked and authentication is disabled for easy demonstration.
-
-## Contributing
-
-This is a private project. For questions or issues, please contact the repository owner.
-
-## Acknowledgments
-
-Built with [Expo](https://expo.dev), [React Navigation](https://reactnavigation.org), and [NativeWind](https://www.nativewind.dev).
-
-## iOS Expo Go Testing Notes
-If you test on an iPhone using Expo Go and you scan the QR/enter the `exp://...` URL:
-- Ensure **iOS Settings → Expo Go → Local Network** is allowed (otherwise the app can get stuck on a loading screen).
-- Only scan the QR generated by the *current* `npm run start:tunnel` / `npm run start:tunnel:strict` run (each run can pick a different port/URL).
-- If tunnel startup fails (e.g. `remote gone away`), retry later or switch networks/hotspots.
+Private project. All rights reserved.
