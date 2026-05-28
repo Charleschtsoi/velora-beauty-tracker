@@ -177,12 +177,16 @@ export default function ScanScreen() {
   const beginPostBarcodePhotoFlow = (product: DemoProductInput, barcode?: string) => {
     const barcodeValue = barcode ?? product.barcode ?? '';
     setPostBarcodeCapture({ kind: 'demo', product, barcode: barcodeValue });
+    if (barcodeValue) {
+      rememberAiSessionBarcode(barcodeValue);
+    }
+    autoPostBarcodeCaptureRef.current = true;
     setScanMode('ai');
     setIsScanning(true);
     setScanned(false);
     setCameraReady(false);
     processingScanRef.current = false;
-    showToast('Now take a quick photo of the product', 'info');
+    showToast('Great match. Hold steady while we capture the label photo.', 'info');
   };
 
   const beginAddProductPhotoFlow = (params: {
@@ -196,18 +200,20 @@ export default function ScanScreen() {
       upcData: params.upcData,
       scanNotFound: params.scanNotFound,
     });
+    rememberAiSessionBarcode(params.barcode);
+    autoPostBarcodeCaptureRef.current = true;
     setScanMode('ai');
     setIsScanning(true);
     setScanned(false);
     setCameraReady(false);
     processingScanRef.current = false;
-    showToast('Now take a quick photo of the product', 'info');
+    showToast('Hold steady while we capture the label photo.', 'info');
   };
 
   const finishPostBarcodePhotoStep = async (photoUri?: string) => {
     const ctx = postBarcodeCapture;
     if (!ctx) return;
-    setPostBarcodeCapture(null);
+    clearPostBarcodeSession();
     setIsScanning(false);
     setIsAnalyzing(false);
 
@@ -289,6 +295,7 @@ export default function ScanScreen() {
   const aiModeAvailable = DEMO_MODE || aiConfigured; // In demo, AI Photo works without backend
   const knownFieldsRef = useRef<Partial<Record<AIFieldKey, string>>>({});
   const processingScanRef = useRef(false); // prevent double-handling one scan
+  const autoPostBarcodeCaptureRef = useRef(false);
   const aiSessionBarcodeRef = useRef<string | null>(null);
   const lastAiBarcodeToastRef = useRef<string | null>(null);
   const scanLineAnim = useRef(new Animated.Value(0)).current;
@@ -297,6 +304,11 @@ export default function ScanScreen() {
     aiSessionBarcodeRef.current = null;
     lastAiBarcodeToastRef.current = null;
     setAiSessionBarcode(null);
+  };
+
+  const clearPostBarcodeSession = () => {
+    autoPostBarcodeCaptureRef.current = false;
+    setPostBarcodeCapture(null);
   };
 
   const rememberAiSessionBarcode = (raw: string) => {
@@ -415,7 +427,16 @@ export default function ScanScreen() {
   }, []);
 
   const handleCameraBarcodeDetected = (result: BarcodeScanningResult) => {
-    if (postBarcodeCapture || isAnalyzing) return;
+    if (isAnalyzing) return;
+
+    // After a barcode match we auto-capture the label photo, but still accept side-barcode
+    // reads so the session chip stays in sync (scanner stays enabled in AI mode).
+    if (postBarcodeCapture) {
+      if (scanMode === 'ai') {
+        rememberAiSessionBarcode(result.data);
+      }
+      return;
+    }
 
     if (scanMode === 'ai' && isScanning) {
       rememberAiSessionBarcode(result.data);
@@ -426,6 +447,29 @@ export default function ScanScreen() {
       handleBarCodeScanned(result);
     }
   };
+
+  const mapLookupDataToFields = (
+    lookupData: Record<string, unknown> | undefined,
+    confidence: number | null
+  ): Record<string, { value: string | null; confidence: number | null; source: string }> => ({
+    name: { value: (lookupData?.name as string | null) ?? null, confidence, source: 'barcode' },
+    brand: { value: (lookupData?.brand as string | null) ?? null, confidence, source: 'barcode' },
+    category: { value: (lookupData?.category as string | null) ?? null, confidence, source: 'barcode' },
+    expirationDate: {
+      value:
+        (lookupData?.expirationDate as string | null) ??
+        (lookupData?.expiration_date as string | null) ??
+        null,
+      confidence,
+      source: 'barcode',
+    },
+    ingredients: {
+      value: (lookupData?.ingredients as string | null) ?? null,
+      confidence,
+      source: 'barcode',
+    },
+    notes: { value: null, confidence: null, source: 'barcode' },
+  });
 
   const handleBarCodeScanned = async ({ type, data }: BarcodeScanningResult) => {
     if (scanned || processingScanRef.current) return;
@@ -499,14 +543,7 @@ export default function ScanScreen() {
 
       if (lookup.success && lookup.data) {
         const confidence = lookup.confidence ?? null;
-        upcData = {
-          name: { value: (lookup.data as any)?.name ?? null, confidence, source: 'barcode' },
-          brand: { value: (lookup.data as any)?.brand ?? null, confidence, source: 'barcode' },
-          category: { value: (lookup.data as any)?.category ?? null, confidence, source: 'barcode' },
-          expirationDate: { value: null, confidence: null, source: 'barcode' },
-          ingredients: { value: (lookup.data as any)?.ingredients ?? null, confidence, source: 'barcode' },
-          notes: { value: null, confidence: null, source: 'barcode' },
-        };
+        upcData = mapLookupDataToFields(lookup.data, confidence);
 
         knownFieldsRef.current = {
           name: upcData.name.value ?? undefined,
@@ -580,6 +617,7 @@ export default function ScanScreen() {
       return;
     }
 
+    clearPostBarcodeSession();
     resetAiSessionBarcode();
     setIsScanning(true);
     setScanned(false);
@@ -587,6 +625,7 @@ export default function ScanScreen() {
   };
 
   const toggleScanMode = () => {
+    clearPostBarcodeSession();
     setScanned(false);
     processingScanRef.current = false;
     const nextMode = scanMode === 'barcode' ? 'ai' : 'barcode';
@@ -641,6 +680,13 @@ export default function ScanScreen() {
       setIsAnalyzing(false);
     }
   };
+
+  useEffect(() => {
+    if (!postBarcodeCapture || !isScanning || !cameraReady || isAnalyzing) return;
+    if (!autoPostBarcodeCaptureRef.current) return;
+    autoPostBarcodeCaptureRef.current = false;
+    void handlePostBarcodePhotoCapture();
+  }, [postBarcodeCapture, isScanning, cameraReady, isAnalyzing]);
 
   const handleCapturePhoto = async () => {
     if (!cameraRef.current || isAnalyzing || !cameraReady) {
@@ -821,6 +867,18 @@ export default function ScanScreen() {
       if (!photo?.uri) throw new Error('Failed to capture photo');
       const capturedPhotoUri = photo.uri;
       const barcodeHint = aiSessionBarcodeRef.current;
+      let upcData: Record<string, { value: string | null; confidence: number | null; source: string }> | undefined;
+
+      if (barcodeHint) {
+        try {
+          const lookup = await lookupProductByBarcode(barcodeHint);
+          if (lookup.success && lookup.data) {
+            upcData = mapLookupDataToFields(lookup.data, lookup.confidence ?? null);
+          }
+        } catch {
+          // Best-effort lookup in AI flow.
+        }
+      }
 
       showToast('Capturing and analyzing image...', 'info');
       const analysisResult = await analyzeProductImage(capturedPhotoUri, knownFieldsRef.current);
@@ -852,6 +910,7 @@ export default function ScanScreen() {
         openAddProduct({
           aiData: analysisResult.fields,
           aiFlatData: analysisResult.flatData,
+          upcData,
           photoUri: capturedPhotoUri,
           barcode: barcodeHint ?? undefined,
         });
@@ -993,9 +1052,7 @@ export default function ScanScreen() {
             style={styles.camera}
             facing="back"
             enableTorch={flashlightEnabled}
-            onBarcodeScanned={
-              isScanning && !postBarcodeCapture ? handleCameraBarcodeDetected : undefined
-            }
+            onBarcodeScanned={isScanning && !isAnalyzing ? handleCameraBarcodeDetected : undefined}
             barcodeScannerSettings={
               isScanning && (scanMode === 'barcode' || scanMode === 'ai')
                 ? { barcodeTypes: [...BARCODE_SCAN_TYPES] }
