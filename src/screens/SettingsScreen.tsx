@@ -17,6 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as settingsStorage from '../services/settingsStorage';
+import { useAuth } from '../context/AuthContext';
 import { colors, typography } from '../theme';
 
 interface SettingsSectionProps {
@@ -83,6 +84,7 @@ function SettingsItem({
 
 export default function SettingsScreen() {
   const navigation = useNavigation<any>();
+  const { user, isGuest, signOut } = useAuth();
 
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [expiringSoonAlert, setExpiringSoonAlert] = useState(true);
@@ -95,8 +97,6 @@ export default function SettingsScreen() {
     d.setHours(9, 0, 0, 0);
     return d;
   });
-
-  const userEmail = 'user@example.com';
 
   useEffect(() => {
     (async () => {
@@ -119,30 +119,20 @@ export default function SettingsScreen() {
   }, []);
 
   const handleLogout = () => {
-    Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Logout',
-          style: 'destructive',
-          onPress: () => {
-            // TODO: Implement actual logout
-            // Clear auth tokens, reset navigation to Auth screen
-            Alert.alert('Logged Out', 'You have been logged out successfully.', [
-              {
-                text: 'OK',
-                onPress: () => {
-                  // navigation.reset({ index: 0, routes: [{ name: 'Auth' }] });
-                  // Navigate to Auth screen (if auth was implemented)
-                },
-              },
-            ]);
-          },
+    Alert.alert('Sign out', 'Your on-device products will stay on this phone. Cloud sync will stop until you sign in again.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Sign out',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await signOut();
+          } catch {
+            Alert.alert('Sign out failed', 'Please try again.');
+          }
         },
-      ]
-    );
+      },
+    ]);
   };
 
   const handleReminderTimePress = () => {
@@ -239,22 +229,45 @@ export default function SettingsScreen() {
       >
         {/* Account Section */}
         <SettingsSection title="Account">
-          <SettingsItem
-            icon="person-circle"
-            iconColor="#10b981"
-            title="Email"
-            subtitle={userEmail}
-            showArrow={false}
-            testID="user-email-item"
-          />
-          <SettingsItem
-            icon="log-out"
-            iconColor="#ef4444"
-            title="Logout"
-            onPress={handleLogout}
-            showArrow={false}
-            testID="logout-button"
-          />
+          {isGuest ? (
+            <>
+              <SettingsItem
+                icon="phone-portrait-outline"
+                iconColor="#6b7280"
+                title="Using this device only"
+                subtitle="Products are saved locally on your phone"
+                showArrow={false}
+                testID="guest-mode-item"
+              />
+              <SettingsItem
+                icon="cloud-upload"
+                iconColor="#10b981"
+                title="Sign in to sync"
+                subtitle="Back up your collection and access it on other devices"
+                onPress={() => navigation.navigate('Login')}
+                testID="sign-in-button"
+              />
+            </>
+          ) : (
+            <>
+              <SettingsItem
+                icon="person-circle"
+                iconColor="#10b981"
+                title="Signed in as"
+                subtitle={user?.email || 'Your account'}
+                showArrow={false}
+                testID="user-email-item"
+              />
+              <SettingsItem
+                icon="log-out"
+                iconColor="#ef4444"
+                title="Sign out"
+                onPress={handleLogout}
+                showArrow={false}
+                testID="logout-button"
+              />
+            </>
+          )}
         </SettingsSection>
 
         {/* Preferences Section */}

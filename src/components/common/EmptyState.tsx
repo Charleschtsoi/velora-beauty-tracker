@@ -1,5 +1,12 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Image,
+  ImageSourcePropType,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, radius, typography } from '../../theme';
 
@@ -7,6 +14,7 @@ type IconName = keyof typeof Ionicons.glyphMap;
 
 interface EmptyStateProps {
   icon?: IconName;
+  image?: ImageSourcePropType;
   title: string;
   subtitle: string;
   buttonLabel?: string;
@@ -15,20 +23,33 @@ interface EmptyStateProps {
 }
 
 /**
- * Shared empty state: icon, display headline, sans body, optional CTA.
+ * Shared empty state: icon or image, display headline, sans body, optional CTA.
  */
 export default function EmptyState({
   icon = 'cube-outline',
+  image,
   title,
   subtitle,
   buttonLabel,
   onButtonPress,
   testID,
 }: EmptyStateProps) {
+  const [imageError, setImageError] = React.useState(false);
+  const showImage = Boolean(image && !imageError);
+
   return (
     <View style={styles.container} testID={testID}>
-      <View style={styles.iconCircle}>
-        <Ionicons name={icon} size={56} color={colors.textTertiary} />
+      <View style={[styles.iconCircle, showImage && styles.iconCircleImage]}>
+        {showImage && image ? (
+          <Image
+            source={image}
+            style={styles.image}
+            resizeMode="contain"
+            onError={() => setImageError(true)}
+          />
+        ) : (
+          <Ionicons name={icon} size={56} color={colors.textTertiary} />
+        )}
       </View>
       <Text style={styles.title}>{title}</Text>
       <Text style={styles.subtitle}>{subtitle}</Text>
@@ -60,6 +81,14 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primaryTint,
     justifyContent: 'center',
     alignItems: 'center',
+    overflow: 'hidden',
+  },
+  iconCircleImage: {
+    backgroundColor: colors.surface,
+  },
+  image: {
+    width: '100%',
+    height: '100%',
   },
   title: {
     ...typography.emptyStateTitle,

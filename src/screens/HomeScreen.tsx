@@ -23,6 +23,7 @@ import EmptyState from '../components/common/EmptyState';
 import { colors, spacing, radius, shadow, typography, TAB_BAR_HEIGHT } from '../theme';
 import * as settingsStorage from '../services/settingsStorage';
 import { HOME_HERO_IMAGE } from '../assets/homeHeroImage';
+import { summaryCardImages, emptyStateImages } from '../assets/cardImages';
 
 const HERO_MIN_HEIGHT = 232;
 /** Clear fixed tab bar + safe breathing room when scrolling last sections */
@@ -343,6 +344,7 @@ export default function HomeScreen() {
                 title="Use soon"
                 count={stats.expiringSoon}
                 icon="time"
+                image={summaryCardImages.expiring_soon ?? undefined}
                 color={colors.statusExpiringSoon}
                 iconBackgroundColor={colors.surfaceMuted}
                 surfaceTint={colors.surface}
@@ -357,6 +359,7 @@ export default function HomeScreen() {
                 title="Past date"
                 count={stats.expired}
                 icon="alert-circle"
+                image={summaryCardImages.expired ?? undefined}
                 color={colors.statusExpired}
                 iconBackgroundColor={colors.surfaceMuted}
                 surfaceTint={colors.surface}
@@ -371,6 +374,7 @@ export default function HomeScreen() {
                 title="Total collection"
                 count={stats.total}
                 icon="cube"
+                image={summaryCardImages.in_collection ?? undefined}
                 color={colors.textPrimary}
                 iconBackgroundColor={colors.surfaceMuted}
                 surfaceTint={colors.surface}
@@ -417,6 +421,7 @@ export default function HomeScreen() {
             <View style={styles.section}>
               <EmptyState
                 icon="cube-outline"
+                image={emptyStateImages.noProductsYet}
                 title="No products yet"
                 subtitle="Tap the image above to add your first product"
               />

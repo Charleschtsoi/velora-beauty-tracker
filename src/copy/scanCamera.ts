@@ -29,6 +29,15 @@ export const scanCameraCopy = {
   postBarcodeMatchedPrefix: 'Got it',
   postBarcodeScannedFallback: 'Barcode captured',
 
+  /** Shown when barcode lookup returns no catalog match — collaborative tone, not an error. */
+  notFoundReminderToast:
+    "We couldn't find this product — we'll need your help adding it.",
+  notFoundTopTitle: 'Not in our catalog yet',
+  notFoundTopSubtitle: 'Help us add it — a photo keeps it on your shelf record',
+  notFoundCaptureTitle: 'Take a photo of the front label',
+  notFoundCaptureSubtitle: "We'll save it with your entry for your records",
+  notFoundCaptureRetry: "Tap the button when you're ready — or skip for now",
+
   sessionBarcodePrefix: 'Using barcode',
 
   manualEntryLead: 'Having trouble?',

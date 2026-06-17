@@ -6,6 +6,7 @@ import ProductDetailScreen from '../screens/ProductDetailScreen';
 import CategoriesScreen from '../screens/CategoriesScreen';
 import ScanScreen from '../screens/ScanScreen';
 import SettingsScreen from '../screens/SettingsScreen';
+import LoginScreen from '../screens/auth/LoginScreen';
 import type { AIFieldMap, AIFieldKey } from '../services/aiService';
 import { stackHeaderTitleStyle, stackHeaderStyle } from '../theme';
 
@@ -13,6 +14,7 @@ export type RootStackParamList = {
   MainTabs: undefined;
   Scan: undefined;
   Settings: undefined;
+  Login: undefined;
   AddProduct:
     | {
         barcode?: string;
@@ -59,6 +61,16 @@ export default function AppNavigator() {
         options={{
           presentation: 'card',
           animation: 'slide_from_right',
+          headerShown: false,
+          gestureEnabled: true,
+        }}
+      />
+      <Stack.Screen
+        name="Login"
+        component={LoginScreen}
+        options={{
+          presentation: 'modal',
+          animation: 'slide_from_bottom',
           headerShown: false,
           gestureEnabled: true,
         }}

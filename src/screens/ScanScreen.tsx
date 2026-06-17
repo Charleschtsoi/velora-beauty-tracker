@@ -200,14 +200,18 @@ export default function ScanScreen() {
       upcData: params.upcData,
       scanNotFound: params.scanNotFound,
     });
-    rememberAiSessionBarcode(params.barcode);
-    autoPostBarcodeCaptureRef.current = true;
+    rememberAiSessionBarcode(params.barcode, { silent: params.scanNotFound });
+    autoPostBarcodeCaptureRef.current = !params.scanNotFound;
     setScanMode('ai');
     setIsScanning(true);
     setScanned(false);
     setCameraReady(false);
     processingScanRef.current = false;
-    showToast('Hold steady while we capture the label photo.', 'info');
+    if (params.scanNotFound) {
+      showToast(scanCameraCopy.notFoundReminderToast, 'info');
+    } else {
+      showToast('Hold steady while we capture the label photo.', 'info');
+    }
   };
 
   const finishPostBarcodePhotoStep = async (photoUri?: string) => {
@@ -311,13 +315,16 @@ export default function ScanScreen() {
     setPostBarcodeCapture(null);
   };
 
-  const rememberAiSessionBarcode = (raw: string) => {
+  const rememberAiSessionBarcode = (raw: string, options?: { silent?: boolean }) => {
     const normalized = raw.replace(/\D/g, '');
     if (normalized.length < 5) return;
     if (aiSessionBarcodeRef.current === normalized) return;
     aiSessionBarcodeRef.current = normalized;
     setAiSessionBarcode(normalized);
-    if (lastAiBarcodeToastRef.current !== normalized) {
+    if (
+      !options?.silent &&
+      lastAiBarcodeToastRef.current !== normalized
+    ) {
       lastAiBarcodeToastRef.current = normalized;
       showToast('Barcode captured — we will use it if the photo match needs help', 'info');
     }
@@ -533,15 +540,15 @@ export default function ScanScreen() {
         return;
       }
 
-      showToast(`Barcode scanned: ${barcodeValue}`, 'success');
       setLookupInProgress(true);
-      showToast('Looking up barcode metadata...', 'info');
+      showToast('Looking up barcode...', 'info');
       const lookup = await lookupProductByBarcode(barcodeValue);
       setLookupInProgress(false);
 
       let upcData: Record<string, { value: string | null; confidence: number | null; source: string }> | undefined;
+      const catalogMatch = lookup.success && lookup.data;
 
-      if (lookup.success && lookup.data) {
+      if (catalogMatch) {
         const confidence = lookup.confidence ?? null;
         upcData = mapLookupDataToFields(lookup.data, confidence);
 
@@ -552,17 +559,15 @@ export default function ScanScreen() {
           ingredients: upcData.ingredients.value ?? undefined,
         };
 
-        showToast('Product info retrieved from barcode lookup.', 'success');
+        showToast('Product details found.', 'success');
       } else {
         knownFieldsRef.current = {};
-        const errorMessage = lookup.error || 'Barcode lookup failed.';
-        showToast(errorMessage, 'error');
       }
 
       beginAddProductPhotoFlow({
         barcode: barcodeValue,
         upcData,
-        scanNotFound: !lookup.success || !lookup.data,
+        scanNotFound: !catalogMatch,
       });
       setScanned(false);
       processingScanRef.current = false;
@@ -572,8 +577,7 @@ export default function ScanScreen() {
       setIsAddingDemo(false);
       processingScanRef.current = false;
       setLookupInProgress(false);
-      showToast('Error scanning barcode. Please try again.', 'error');
-      openAddProduct({
+      beginAddProductPhotoFlow({
         barcode: barcodeValue,
         scanNotFound: true,
       });
@@ -674,8 +678,14 @@ export default function ScanScreen() {
       showToast('Photo saved with product', 'success');
       await finishPostBarcodePhotoStep(photo.uri);
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Failed to capture photo';
-      showToast(message, 'error');
+      const isNotFound =
+        postBarcodeCapture?.kind === 'add' && Boolean(postBarcodeCapture.scanNotFound);
+      if (isNotFound) {
+        showToast(scanCameraCopy.notFoundCaptureRetry, 'info');
+      } else {
+        const message = error instanceof Error ? error.message : 'Failed to capture photo';
+        showToast(message, 'error');
+      }
     } finally {
       setIsAnalyzing(false);
     }
@@ -992,6 +1002,9 @@ export default function ScanScreen() {
     );
   }
 
+  const isNotFoundPhotoFlow =
+    postBarcodeCapture?.kind === 'add' && Boolean(postBarcodeCapture.scanNotFound);
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <Modal
@@ -1086,13 +1099,16 @@ export default function ScanScreen() {
               {postBarcodeCapture && (
                 <View style={styles.instructionChipTop} pointerEvents="none">
                   <ScanCameraHint
-                    compact
+                    compact={!isNotFoundPhotoFlow}
                     maxWidthFactor={0.92}
                     title={
-                      getPostBarcodeProductLabel()
-                        ? `${scanCameraCopy.postBarcodeMatchedPrefix} — ${getPostBarcodeProductLabel()}`
-                        : scanCameraCopy.postBarcodeScannedFallback
+                      isNotFoundPhotoFlow
+                        ? scanCameraCopy.notFoundTopTitle
+                        : getPostBarcodeProductLabel()
+                          ? `${scanCameraCopy.postBarcodeMatchedPrefix} — ${getPostBarcodeProductLabel()}`
+                          : scanCameraCopy.postBarcodeScannedFallback
                     }
+                    subtitle={isNotFoundPhotoFlow ? scanCameraCopy.notFoundTopSubtitle : undefined}
                   />
                 </View>
               )}
@@ -1156,8 +1172,16 @@ export default function ScanScreen() {
                   <View style={styles.captureHintBelowShutter}>
                     {cameraReady ? (
                       <ScanCameraHint
-                        title={scanCameraCopy.postBarcodeCaptureTitle}
-                        subtitle={scanCameraCopy.postBarcodeCaptureSubtitle}
+                        title={
+                          isNotFoundPhotoFlow
+                            ? scanCameraCopy.notFoundCaptureTitle
+                            : scanCameraCopy.postBarcodeCaptureTitle
+                        }
+                        subtitle={
+                          isNotFoundPhotoFlow
+                            ? scanCameraCopy.notFoundCaptureSubtitle
+                            : scanCameraCopy.postBarcodeCaptureSubtitle
+                        }
                       />
                     ) : (
                       <ScanCameraHint title={scanCameraCopy.cameraWaiting} compact />
