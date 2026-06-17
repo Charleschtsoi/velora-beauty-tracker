@@ -371,6 +371,11 @@ export default function AddProductScreen() {
 
         {/* Photo Uploader */}
         <View style={styles.photoSection}>
+          {showScanNotFoundBanner && !photoUri && (
+            <Text style={styles.photoHelper}>
+              A quick product photo helps you spot it on your shelf later — optional but nice to have.
+            </Text>
+          )}
           <PhotoUploader
             photoUri={photoUri}
             onPhotoSelected={setPhotoUri}
@@ -629,6 +634,13 @@ const styles = StyleSheet.create({
   },
   photoSection: {
     marginBottom: 16,
+  },
+  photoHelper: {
+    fontSize: 14,
+    color: '#065f46',
+    lineHeight: 20,
+    marginBottom: 10,
+    fontWeight: '500',
   },
   fieldContainer: {
     marginBottom: 16,

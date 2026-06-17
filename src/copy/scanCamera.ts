@@ -32,6 +32,10 @@ export const scanCameraCopy = {
   /** Shown when barcode lookup returns no catalog match — collaborative tone, not an error. */
   notFoundReminderToast:
     "We couldn't find this product — we'll need your help adding it.",
+  barcodeSavedToast: 'Barcode saved — add the details below to store it.',
+  barcodeFoundToast: 'Barcode matched — review the details and save.',
+  barcodeLookupFailedToast: 'Barcode saved — we will need a few details from you.',
+
   notFoundTopTitle: 'Not in our catalog yet',
   notFoundTopSubtitle: 'Help us add it — a photo keeps it on your shelf record',
   notFoundCaptureTitle: 'Take a photo of the front label',
@@ -44,7 +48,33 @@ export const scanCameraCopy = {
   manualEntryAction: 'Manual entry',
 
   skipPhotoForNow: 'Skip for now',
+  addPhotoLaterHint: 'Add a product photo on the next screen if you like — optional.',
 } as const;
+
+function isCaptureFailureMessage(message: string): boolean {
+  const lower = message.toLowerCase();
+  return (
+    lower.includes('capture') ||
+    lower.includes('could not be') ||
+    lower.includes('failed to capture') ||
+    lower.includes('camera')
+  );
+}
+
+export function friendlyCaptureFailureMessage(scanNotFound?: boolean): string {
+  if (scanNotFound) {
+    return scanCameraCopy.notFoundCaptureRetry;
+  }
+  return 'Photo optional — tap to try again or skip for now.';
+}
+
+export function normalizeCaptureError(error: unknown, scanNotFound?: boolean): string {
+  const message = error instanceof Error ? error.message : String(error);
+  if (isCaptureFailureMessage(message)) {
+    return friendlyCaptureFailureMessage(scanNotFound);
+  }
+  return message || friendlyCaptureFailureMessage(scanNotFound);
+}
 
 const SESSION_BARCODE_MAX = 18;
 
