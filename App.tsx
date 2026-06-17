@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, ActivityIndicator, StyleSheet, Platform } from 'react-native';
 import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts, CormorantGaramond_400Regular } from '@expo-google-fonts/cormorant-garamond';
 import * as Notifications from 'expo-notifications';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ProductProvider } from './src/context/ProductContext';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import AppNavigator from './src/navigation/AppNavigator';
@@ -51,7 +52,7 @@ function AppRoot() {
   /** In demo mode, welcome is shown every launch; this tracks "dismissed this session" so we can show main app after Get started. */
   const [demoWelcomeDismissed, setDemoWelcomeDismissed] = useState(false);
   const lastResponseHandled = useRef<string | null>(null);
-  const lastNotificationResponse = Notifications.useLastNotificationResponse();
+  const lastNotificationResponse = Platform.OS !== 'web' ? Notifications.useLastNotificationResponse() : null;
 
   useEffect(() => {
     settingsStorage.getHasSeenWelcome().then(setHasSeenWelcome);
@@ -70,7 +71,7 @@ function AppRoot() {
 
   // Handle notification tap (foreground/background)
   useEffect(() => {
-    if (!appReady) return;
+    if (!appReady || Platform.OS === 'web') return;
     const sub = Notifications.addNotificationResponseReceivedListener((response) => {
       const productId = response.notification.request.content.data?.productId as string | undefined;
       if (productId) navigateToProduct(productId);
@@ -103,15 +104,15 @@ function AppRoot() {
     (DEMO_MODE && !demoWelcomeDismissed) || (!DEMO_MODE && hasSeenWelcome === false);
   if (showWelcome) {
     return (
-      <>
+      <SafeAreaProvider>
         <StatusBar style="dark" />
         <WelcomeScreen onComplete={handleWelcomeComplete} />
-      </>
+      </SafeAreaProvider>
     );
   }
 
   return (
-    <>
+    <SafeAreaProvider>
       <ProductProvider>
         <NavigationContainer ref={navigationRef}>
           <StatusBar style="dark" />
@@ -119,7 +120,7 @@ function AppRoot() {
         </NavigationContainer>
         <ToastContainer />
       </ProductProvider>
-    </>
+    </SafeAreaProvider>
   );
 }
 
