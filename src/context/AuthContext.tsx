@@ -1,17 +1,20 @@
-import React, { createContext, useState, useEffect, ReactNode } from 'react';
-import { supabase } from '../services/supabase';
+import React, { createContext, useState, useEffect, ReactNode, useMemo } from 'react';
+import { supabase, isSupabaseConfigured } from '../services/supabase';
+import * as authService from '../services/authService';
+import { GUEST_USER_ID } from '../constants/auth';
 
 interface User {
   id: string;
   email: string;
-  // Add more user fields as needed
 }
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string) => Promise<void>;
+  isGuest: boolean;
+  effectiveUserId: string;
+  signInWithGoogle: () => Promise<void>;
+  signInWithApple: () => Promise<void>;
   signOut: () => Promise<void>;
   isAuthenticated: boolean;
 }
@@ -22,99 +25,68 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    // Check if user is already logged in
-    checkUser();
+  const mapSessionUser = (sessionUser: { id: string; email?: string | null }) => ({
+    id: sessionUser.id,
+    email: sessionUser.email || '',
+  });
 
-    // Listen for auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) {
-        setUser({
-          id: session.user.id,
-          email: session.user.email || '',
-        });
-      } else {
-        setUser(null);
-      }
+  useEffect(() => {
+    if (!isSupabaseConfigured()) {
+      setLoading(false);
+      return;
+    }
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ? mapSessionUser(session.user) : null);
       setLoading(false);
     });
 
-    return () => {
-      subscription.unsubscribe();
-    };
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ? mapSessionUser(session.user) : null);
+      setLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  const checkUser = async () => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        setUser({
-          id: session.user.id,
-          email: session.user.email || '',
-        });
-      }
-    } catch (error) {
-      // Silently handle auth error for demo
-    } finally {
-      setLoading(false);
-    }
+  const signInWithGoogle = async () => {
+    await authService.signInWithGoogle();
   };
 
-  const signIn = async (email: string, password: string) => {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (error) throw error;
-
-    if (data.user) {
-      setUser({
-        id: data.user.id,
-        email: data.user.email || '',
-      });
-    }
-  };
-
-  const signUp = async (email: string, password: string) => {
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-    });
-
-    if (error) throw error;
-
-    if (data.user) {
-      setUser({
-        id: data.user.id,
-        email: data.user.email || '',
-      });
-    }
+  const signInWithApple = async () => {
+    await authService.signInWithApple();
   };
 
   const signOut = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) throw error;
+    if (isSupabaseConfigured()) {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+    }
     setUser(null);
   };
 
-  return (
-    <AuthContext.Provider
-      value={{
-        user,
-        loading,
-        signIn,
-        signUp,
-        signOut,
-        isAuthenticated: !!user,
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
+  const isGuest = !user;
+  const effectiveUserId = user?.id ?? GUEST_USER_ID;
+
+  const value = useMemo(
+    () => ({
+      user,
+      loading,
+      isGuest,
+      effectiveUserId,
+      signInWithGoogle,
+      signInWithApple,
+      signOut,
+      isAuthenticated: !!user,
+    }),
+    [user, loading, isGuest, effectiveUserId]
   );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
-// Hook for using auth context
 export const useAuth = () => {
   const context = React.useContext(AuthContext);
   if (context === undefined) {

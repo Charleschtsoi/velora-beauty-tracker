@@ -19,10 +19,10 @@ import SummaryCard from '../components/common/SummaryCard';
 import ProductCard from '../components/products/ProductCard';
 import { useNavigation } from '@react-navigation/native';
 import { SkeletonCard } from '../components/common/SkeletonLoader';
-import EmptyState from '../components/common/EmptyState';
 import { colors, spacing, radius, shadow, typography, TAB_BAR_HEIGHT } from '../theme';
 import * as settingsStorage from '../services/settingsStorage';
 import { HOME_HERO_IMAGE } from '../assets/homeHeroImage';
+import { summaryCardImages } from '../assets/cardImages';
 
 const HERO_MIN_HEIGHT = 232;
 /** Clear fixed tab bar + safe breathing room when scrolling last sections */
@@ -37,6 +37,7 @@ function getGreeting() {
 
 function HeroBanner({ onPress, translateY }: { onPress: () => void; translateY: Animated.Value }) {
   const scale = useRef(new Animated.Value(1)).current;
+  const [heroImageError, setHeroImageError] = React.useState(false);
 
   return (
     <Animated.View
@@ -57,7 +58,18 @@ function HeroBanner({ onPress, translateY }: { onPress: () => void; translateY: 
       >
         <Animated.View style={[styles.heroCardAnimated, { transform: [{ scale }] }]}>
           <View style={styles.heroCard}>
-            <Image source={HOME_HERO_IMAGE} style={styles.heroImage} resizeMode="cover" />
+            {!heroImageError ? (
+              <Image
+                source={HOME_HERO_IMAGE}
+                style={styles.heroImage}
+                resizeMode="cover"
+                onError={() => setHeroImageError(true)}
+              />
+            ) : (
+              <View style={[styles.heroImage, styles.heroImageFallback]}>
+                <Ionicons name="sparkles-outline" size={40} color={colors.primary} />
+              </View>
+            )}
             <View style={styles.heroOverlay} pointerEvents="none">
               <View style={styles.heroOverlayContent}>
                 <View style={styles.heroIconRing}>
@@ -343,6 +355,7 @@ export default function HomeScreen() {
                 title="Use soon"
                 count={stats.expiringSoon}
                 icon="time"
+                image={summaryCardImages.expiring_soon ?? undefined}
                 color={colors.statusExpiringSoon}
                 iconBackgroundColor={colors.surfaceMuted}
                 surfaceTint={colors.surface}
@@ -357,6 +370,7 @@ export default function HomeScreen() {
                 title="Past date"
                 count={stats.expired}
                 icon="alert-circle"
+                image={summaryCardImages.expired ?? undefined}
                 color={colors.statusExpired}
                 iconBackgroundColor={colors.surfaceMuted}
                 surfaceTint={colors.surface}
@@ -371,6 +385,7 @@ export default function HomeScreen() {
                 title="Total collection"
                 count={stats.total}
                 icon="cube"
+                image={summaryCardImages.in_collection ?? undefined}
                 color={colors.textPrimary}
                 iconBackgroundColor={colors.surfaceMuted}
                 surfaceTint={colors.surface}
@@ -412,17 +427,7 @@ export default function HomeScreen() {
               />
             ))}
           </View>
-        ) : (
-          products.length === 0 && (
-            <View style={styles.section}>
-              <EmptyState
-                icon="cube-outline"
-                title="No products yet"
-                subtitle="Tap the image above to add your first product"
-              />
-            </View>
-          )
-        )}
+        ) : null}
       </ScrollView>
 
       <FirstRunModal
@@ -492,6 +497,10 @@ const styles = StyleSheet.create({
     width: '100%',
     height: HERO_MIN_HEIGHT,
     backgroundColor: colors.heroTint,
+  },
+  heroImageFallback: {
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   heroOverlay: {
     ...StyleSheet.absoluteFillObject,

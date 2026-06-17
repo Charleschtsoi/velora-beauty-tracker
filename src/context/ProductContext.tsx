@@ -1,6 +1,8 @@
-import React, { createContext, useState, useEffect, ReactNode, useContext } from 'react';
+import React, { createContext, useState, useEffect, ReactNode, useContext, useCallback } from 'react';
 import { Product } from '../types/product.types';
 import * as productService from '../services/productService';
+import { useAuth } from './AuthContext';
+import { isSupabaseConfigured } from '../services/supabase';
 
 interface ProductContextType {
   products: Product[];
@@ -15,43 +17,61 @@ interface ProductContextType {
 export const ProductContext = createContext<ProductContextType | undefined>(undefined);
 
 export const ProductProvider = ({ children }: { children: ReactNode }) => {
+  const { user, effectiveUserId } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchProducts = async () => {
+  const fetchProducts = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      // Simulate network delay for demo
-      await new Promise(resolve => setTimeout(resolve, 500));
-      const fetchedProducts = await productService.fetchProducts();
+      const fetchedProducts = await productService.fetchProducts(effectiveUserId);
       setProducts(fetchedProducts);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch products';
       setError(errorMessage);
-      // Silently handle error for demo - no console.error
     } finally {
       setLoading(false);
     }
-  };
+  }, [effectiveUserId]);
 
-  const addProduct = async (product: Omit<Product, 'id' | 'createdAt' | 'updatedAt' | 'userId'>): Promise<Product | void> => {
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        if (user?.id && isSupabaseConfigured()) {
+          await productService.migrateLocalProductsToCloud(user.id);
+        }
+        if (cancelled) return;
+        const fetchedProducts = await productService.fetchProducts(effectiveUserId);
+        if (!cancelled) setProducts(fetchedProducts);
+      } catch (err) {
+        if (!cancelled) {
+          const errorMessage = err instanceof Error ? err.message : 'Failed to load products';
+          setError(errorMessage);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [effectiveUserId, user?.id]);
+
+  const addProduct = async (
+    product: Omit<Product, 'id' | 'createdAt' | 'updatedAt' | 'userId'>
+  ): Promise<Product | void> => {
     setLoading(true);
     setError(null);
     try {
-      // Simulate network delay for demo
-      await new Promise(resolve => setTimeout(resolve, 300));
-      const newProduct: Product = {
-        ...product,
-        id: Date.now().toString(),
-        userId: 'demo-user',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-      const nextProducts = [newProduct, ...products];
-      setProducts(nextProducts);
-      await productService.persistProducts(nextProducts);
+      const newProduct = await productService.createProduct(effectiveUserId, product);
+      setProducts((prev) => [newProduct, ...prev]);
       return newProduct;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to add product';
@@ -66,11 +86,8 @@ export const ProductProvider = ({ children }: { children: ReactNode }) => {
     setLoading(true);
     setError(null);
     try {
-      // Simulate network delay for demo
-      await new Promise(resolve => setTimeout(resolve, 300));
-      const nextProducts = products.map(p => p.id === id ? { ...p, ...updates, updatedAt: new Date() } : p);
-      setProducts(nextProducts);
-      await productService.persistProducts(nextProducts);
+      const updated = await productService.updateProductById(effectiveUserId, id, updates);
+      setProducts((prev) => prev.map((p) => (p.id === id ? updated : p)));
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to update product';
       setError(errorMessage);
@@ -84,11 +101,8 @@ export const ProductProvider = ({ children }: { children: ReactNode }) => {
     setLoading(true);
     setError(null);
     try {
-      // Simulate network delay for demo
-      await new Promise(resolve => setTimeout(resolve, 300));
-      const nextProducts = products.filter(p => p.id !== id);
-      setProducts(nextProducts);
-      await productService.persistProducts(nextProducts);
+      await productService.deleteProductById(effectiveUserId, id);
+      setProducts((prev) => prev.filter((p) => p.id !== id));
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to delete product';
       setError(errorMessage);
@@ -98,12 +112,10 @@ export const ProductProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  useEffect(() => {
-    fetchProducts();
-  }, []);
-
   return (
-    <ProductContext.Provider value={{ products, loading, error, fetchProducts, addProduct, updateProduct, deleteProduct }}>
+    <ProductContext.Provider
+      value={{ products, loading, error, fetchProducts, addProduct, updateProduct, deleteProduct }}
+    >
       {children}
     </ProductContext.Provider>
   );

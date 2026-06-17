@@ -75,7 +75,12 @@ export default function SummaryCard({
       >
         <View style={[styles.iconGrid, styles.imageContainer, { backgroundColor: bgColor }]}>
           {showImage && image ? (
-            <Image source={image} style={styles.cardImage} resizeMode="cover" onError={() => setImageError(true)} />
+            <Image
+              source={image}
+              style={styles.cardImage}
+              resizeMode="contain"
+              onError={() => setImageError(true)}
+            />
           ) : (
             <Ionicons name={icon} size={20} color={color} />
           )}

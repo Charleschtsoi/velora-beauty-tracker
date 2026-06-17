@@ -1,5 +1,6 @@
 import * as FileSystem from 'expo-file-system/legacy';
 import { supabase } from './supabase';
+import { isSupabaseConfigured } from '../config/supabaseConfig';
 import type { DemoProductInput } from '../config/demoProducts';
 
 export type AIFieldKey =
@@ -221,10 +222,5 @@ export async function resolveDemoProductImage(
  * Mirrors supabase.ts config so AI mode is enabled when the project is set up.
  */
 export function isAIServiceConfigured(): boolean {
-  const url =
-    process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://jkwzfmafeiylypbwiqca.supabase.co';
-  const key =
-    process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ||
-    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imprd3pmbWFmZWl5bHlwYndpcWNhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4MTgwNzQsImV4cCI6MjA5NTM5NDA3NH0.FL9YTc_e7Hh1jxuErcdk4d3bRAyckd1DK-tlseQoGSw';
-  return !!(url && key);
+  return isSupabaseConfigured();
 }

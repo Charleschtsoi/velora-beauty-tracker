@@ -6,6 +6,7 @@ import { useFonts, CormorantGaramond_400Regular } from '@expo-google-fonts/cormo
 import * as Notifications from 'expo-notifications';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ProductProvider } from './src/context/ProductContext';
+import { AuthProvider, useAuth } from './src/context/AuthContext';
 import AppNavigator from './src/navigation/AppNavigator';
 import type { RootStackParamList } from './src/navigation/AppNavigator';
 import WelcomeScreen from './src/screens/welcome/WelcomeScreen';
@@ -32,6 +33,17 @@ Notifications.setNotificationHandler({
 });
 
 export default function App() {
+  return (
+    <ErrorBoundary>
+      <AuthProvider>
+        <AppRoot />
+      </AuthProvider>
+    </ErrorBoundary>
+  );
+}
+
+function AppRoot() {
+  const { loading: authLoading } = useAuth();
   const [fontsLoaded] = useFonts({
     CormorantGaramond_400Regular,
   });
@@ -80,7 +92,7 @@ export default function App() {
     setTimeout(() => navigateToProduct(productId), 300);
   }, [appReady, lastNotificationResponse]);
 
-  if (!fontsLoaded || hasSeenWelcome === null) {
+  if (!fontsLoaded || hasSeenWelcome === null || authLoading) {
     return (
       <View style={styles.loadingRoot}>
         <ActivityIndicator size="large" color="#1A1A1A" />
@@ -101,15 +113,13 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <ErrorBoundary>
-        <ProductProvider>
-          <NavigationContainer ref={navigationRef}>
-            <StatusBar style="dark" />
-            <AppNavigator />
-            <ToastContainer />
-          </NavigationContainer>
-        </ProductProvider>
-      </ErrorBoundary>
+      <ProductProvider>
+        <NavigationContainer ref={navigationRef}>
+          <StatusBar style="dark" />
+          <AppNavigator />
+        </NavigationContainer>
+        <ToastContainer />
+      </ProductProvider>
     </SafeAreaProvider>
   );
 }

@@ -45,7 +45,7 @@ import {
 } from '../services/demoScanResolver';
 import { onProductSaved } from '../services/localNotificationService';
 import { colors, spacing, radius, shadow, typography } from '../theme';
-import { scanCameraCopy, truncateBarcodeForDisplay } from '../copy/scanCamera';
+import { scanCameraCopy, truncateBarcodeForDisplay, normalizeCaptureError } from '../copy/scanCamera';
 import { ScanCameraHint } from '../components/scan/ScanCameraHint';
 
 const { width, height } = Dimensions.get('window');
@@ -180,34 +180,43 @@ export default function ScanScreen() {
     if (barcodeValue) {
       rememberAiSessionBarcode(barcodeValue);
     }
-    autoPostBarcodeCaptureRef.current = true;
     setScanMode('ai');
     setIsScanning(true);
     setScanned(false);
     setCameraReady(false);
     processingScanRef.current = false;
-    showToast('Great match. Hold steady while we capture the label photo.', 'info');
+    showToast('Optional: capture the label photo, or skip to continue.', 'info');
   };
 
-  const beginAddProductPhotoFlow = (params: {
+  /** Production barcode path — barcode is enough; photo happens on the form if the user wants it. */
+  const completeBarcodeAddFlow = (params: {
     barcode: string;
     upcData?: Record<string, { value: string | null; confidence: number | null; source: string }>;
     scanNotFound?: boolean;
+    lookupFailed?: boolean;
   }) => {
-    setPostBarcodeCapture({
-      kind: 'add',
+    clearPostBarcodeSession();
+    resetAiSessionBarcode();
+    setIsScanning(false);
+    setIsAnalyzing(false);
+    setScanned(false);
+    processingScanRef.current = false;
+
+    if (params.scanNotFound) {
+      showToast(scanCameraCopy.notFoundReminderToast, 'info');
+    } else if (params.lookupFailed) {
+      showToast(scanCameraCopy.barcodeLookupFailedToast, 'info');
+    } else if (params.upcData) {
+      showToast(scanCameraCopy.barcodeFoundToast, 'success');
+    } else {
+      showToast(scanCameraCopy.barcodeSavedToast, 'success');
+    }
+
+    openAddProduct({
       barcode: params.barcode,
       upcData: params.upcData,
       scanNotFound: params.scanNotFound,
     });
-    rememberAiSessionBarcode(params.barcode);
-    autoPostBarcodeCaptureRef.current = true;
-    setScanMode('ai');
-    setIsScanning(true);
-    setScanned(false);
-    setCameraReady(false);
-    processingScanRef.current = false;
-    showToast('Hold steady while we capture the label photo.', 'info');
   };
 
   const finishPostBarcodePhotoStep = async (photoUri?: string) => {
@@ -295,7 +304,6 @@ export default function ScanScreen() {
   const aiModeAvailable = DEMO_MODE || aiConfigured; // In demo, AI Photo works without backend
   const knownFieldsRef = useRef<Partial<Record<AIFieldKey, string>>>({});
   const processingScanRef = useRef(false); // prevent double-handling one scan
-  const autoPostBarcodeCaptureRef = useRef(false);
   const aiSessionBarcodeRef = useRef<string | null>(null);
   const lastAiBarcodeToastRef = useRef<string | null>(null);
   const scanLineAnim = useRef(new Animated.Value(0)).current;
@@ -307,17 +315,19 @@ export default function ScanScreen() {
   };
 
   const clearPostBarcodeSession = () => {
-    autoPostBarcodeCaptureRef.current = false;
     setPostBarcodeCapture(null);
   };
 
-  const rememberAiSessionBarcode = (raw: string) => {
+  const rememberAiSessionBarcode = (raw: string, options?: { silent?: boolean }) => {
     const normalized = raw.replace(/\D/g, '');
     if (normalized.length < 5) return;
     if (aiSessionBarcodeRef.current === normalized) return;
     aiSessionBarcodeRef.current = normalized;
     setAiSessionBarcode(normalized);
-    if (lastAiBarcodeToastRef.current !== normalized) {
+    if (
+      !options?.silent &&
+      lastAiBarcodeToastRef.current !== normalized
+    ) {
       lastAiBarcodeToastRef.current = normalized;
       showToast('Barcode captured — we will use it if the photo match needs help', 'info');
     }
@@ -533,15 +543,15 @@ export default function ScanScreen() {
         return;
       }
 
-      showToast(`Barcode scanned: ${barcodeValue}`, 'success');
       setLookupInProgress(true);
-      showToast('Looking up barcode metadata...', 'info');
+      showToast('Looking up barcode...', 'info');
       const lookup = await lookupProductByBarcode(barcodeValue);
       setLookupInProgress(false);
 
       let upcData: Record<string, { value: string | null; confidence: number | null; source: string }> | undefined;
+      const catalogMatch = lookup.success && lookup.data;
 
-      if (lookup.success && lookup.data) {
+      if (catalogMatch) {
         const confidence = lookup.confidence ?? null;
         upcData = mapLookupDataToFields(lookup.data, confidence);
 
@@ -552,17 +562,15 @@ export default function ScanScreen() {
           ingredients: upcData.ingredients.value ?? undefined,
         };
 
-        showToast('Product info retrieved from barcode lookup.', 'success');
+        showToast('Product details found.', 'success');
       } else {
         knownFieldsRef.current = {};
-        const errorMessage = lookup.error || 'Barcode lookup failed.';
-        showToast(errorMessage, 'error');
       }
 
-      beginAddProductPhotoFlow({
+      completeBarcodeAddFlow({
         barcode: barcodeValue,
         upcData,
-        scanNotFound: !lookup.success || !lookup.data,
+        scanNotFound: !catalogMatch,
       });
       setScanned(false);
       processingScanRef.current = false;
@@ -572,10 +580,10 @@ export default function ScanScreen() {
       setIsAddingDemo(false);
       processingScanRef.current = false;
       setLookupInProgress(false);
-      showToast('Error scanning barcode. Please try again.', 'error');
-      openAddProduct({
+      completeBarcodeAddFlow({
         barcode: barcodeValue,
         scanNotFound: true,
+        lookupFailed: true,
       });
     }
   };
@@ -649,7 +657,7 @@ export default function ScanScreen() {
   const handlePostBarcodePhotoCapture = async () => {
     if (!cameraRef.current || isAnalyzing || !cameraReady) {
       if (!cameraReady) {
-        showToast('Camera not ready. Please wait...', 'error');
+        showToast(scanCameraCopy.cameraWaiting, 'info');
       }
       return;
     }
@@ -674,24 +682,18 @@ export default function ScanScreen() {
       showToast('Photo saved with product', 'success');
       await finishPostBarcodePhotoStep(photo.uri);
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Failed to capture photo';
-      showToast(message, 'error');
+      const isNotFound =
+        postBarcodeCapture?.kind === 'add' && Boolean(postBarcodeCapture.scanNotFound);
+      showToast(normalizeCaptureError(error, isNotFound), 'info');
     } finally {
       setIsAnalyzing(false);
     }
   };
 
-  useEffect(() => {
-    if (!postBarcodeCapture || !isScanning || !cameraReady || isAnalyzing) return;
-    if (!autoPostBarcodeCaptureRef.current) return;
-    autoPostBarcodeCaptureRef.current = false;
-    void handlePostBarcodePhotoCapture();
-  }, [postBarcodeCapture, isScanning, cameraReady, isAnalyzing]);
-
   const handleCapturePhoto = async () => {
     if (!cameraRef.current || isAnalyzing || !cameraReady) {
       if (!cameraReady) {
-        showToast('Camera not ready. Please wait...', 'error');
+        showToast(scanCameraCopy.cameraWaiting, 'info');
       }
       return;
     }
@@ -888,8 +890,10 @@ export default function ScanScreen() {
           setIsAnalyzing(false);
           setIsScanning(false);
           resetAiSessionBarcode();
-          showToast('Photo analysis failed — using barcode instead.', 'info');
-          beginAddProductPhotoFlow({ barcode: barcodeHint, scanNotFound: true });
+          completeBarcodeAddFlow({
+            barcode: barcodeHint,
+            scanNotFound: true,
+          });
           return;
         }
         throw new Error(analysisResult.error || 'Failed to analyze image');
@@ -917,11 +921,17 @@ export default function ScanScreen() {
         setIsAnalyzing(false);
         setScanned(false);
       }, 300);
-    } catch (error: any) {
+    } catch (error: unknown) {
       setIsAnalyzing(false);
       setIsScanning(false);
       setScanned(false);
-      showToast(error.message || 'Failed to analyze image. Please try again.', 'error');
+      const message = error instanceof Error ? error.message : '';
+      const isCaptureIssue = message.toLowerCase().includes('capture') || message.toLowerCase().includes('timeout');
+      if (isCaptureIssue) {
+        showToast(normalizeCaptureError(error), 'info');
+        return;
+      }
+      showToast(message || 'Could not read this label. Try again or add manually.', 'error');
       openAddProduct({
         photoUri: photo?.uri,
         scanNotFound: true,
@@ -991,6 +1001,9 @@ export default function ScanScreen() {
       </SafeAreaView>
     );
   }
+
+  const isNotFoundPhotoFlow =
+    postBarcodeCapture?.kind === 'add' && Boolean(postBarcodeCapture.scanNotFound);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -1086,13 +1099,16 @@ export default function ScanScreen() {
               {postBarcodeCapture && (
                 <View style={styles.instructionChipTop} pointerEvents="none">
                   <ScanCameraHint
-                    compact
+                    compact={!isNotFoundPhotoFlow}
                     maxWidthFactor={0.92}
                     title={
-                      getPostBarcodeProductLabel()
-                        ? `${scanCameraCopy.postBarcodeMatchedPrefix} — ${getPostBarcodeProductLabel()}`
-                        : scanCameraCopy.postBarcodeScannedFallback
+                      isNotFoundPhotoFlow
+                        ? scanCameraCopy.notFoundTopTitle
+                        : getPostBarcodeProductLabel()
+                          ? `${scanCameraCopy.postBarcodeMatchedPrefix} — ${getPostBarcodeProductLabel()}`
+                          : scanCameraCopy.postBarcodeScannedFallback
                     }
+                    subtitle={isNotFoundPhotoFlow ? scanCameraCopy.notFoundTopSubtitle : undefined}
                   />
                 </View>
               )}
@@ -1156,8 +1172,16 @@ export default function ScanScreen() {
                   <View style={styles.captureHintBelowShutter}>
                     {cameraReady ? (
                       <ScanCameraHint
-                        title={scanCameraCopy.postBarcodeCaptureTitle}
-                        subtitle={scanCameraCopy.postBarcodeCaptureSubtitle}
+                        title={
+                          isNotFoundPhotoFlow
+                            ? scanCameraCopy.notFoundCaptureTitle
+                            : scanCameraCopy.postBarcodeCaptureTitle
+                        }
+                        subtitle={
+                          isNotFoundPhotoFlow
+                            ? scanCameraCopy.notFoundCaptureSubtitle
+                            : scanCameraCopy.postBarcodeCaptureSubtitle
+                        }
                       />
                     ) : (
                       <ScanCameraHint title={scanCameraCopy.cameraWaiting} compact />
@@ -1319,7 +1343,9 @@ export default function ScanScreen() {
                 size={24}
                 color={colors.white}
               />
-              <Text style={styles.scanButtonText}>Open camera</Text>
+              <Text style={styles.scanButtonText}>
+                {scanMode === 'ai' ? 'Open camera' : 'Scan barcode'}
+              </Text>
             </>
           )}
         </TouchableOpacity>

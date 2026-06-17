@@ -1,10 +1,99 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Product } from '../types/product.types';
+import * as Crypto from 'expo-crypto';
+import { Product, ProductCategory } from '../types/product.types';
+import { GUEST_USER_ID, isGuestUserId } from '../constants/auth';
 import { supabase } from './supabase';
 
 const PRODUCTS_STORAGE_KEY = '@hermes/products';
+const DEMO_DATA_PURGED_KEY = '@hermes/demoDataPurgedV1';
+const LOCAL_MIGRATED_KEY = '@hermes/localProductsMigratedV1';
+const LEGACY_DEMO_USER_ID = 'demo-user';
 
-/** Serialize Product for storage (dates to ISO strings). */
+type ProductRow = {
+  id: string;
+  user_id: string;
+  name: string;
+  brand: string | null;
+  category: string;
+  purchase_date: string | null;
+  expiration_date: string;
+  opened_date: string | null;
+  pao_months: number | null;
+  location: string | null;
+  barcode: string | null;
+  photo_url: string | null;
+  usage_count: number | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+function rowToProduct(row: ProductRow): Product {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    name: row.name,
+    brand: row.brand ?? undefined,
+    category: row.category as ProductCategory,
+    purchaseDate: row.purchase_date ? new Date(row.purchase_date) : undefined,
+    expirationDate: new Date(row.expiration_date),
+    openedDate: row.opened_date ? new Date(row.opened_date) : undefined,
+    paoMonths: row.pao_months ?? undefined,
+    location: row.location ?? undefined,
+    barcode: row.barcode ?? undefined,
+    photoUrl: row.photo_url ?? undefined,
+    usageCount: row.usage_count ?? undefined,
+    notes: row.notes ?? undefined,
+    createdAt: new Date(row.created_at),
+    updatedAt: new Date(row.updated_at),
+  };
+}
+
+function productToInsertRow(
+  userId: string,
+  product: Omit<Product, 'id' | 'userId' | 'createdAt' | 'updatedAt'>
+) {
+  return {
+    user_id: userId,
+    name: product.name,
+    brand: product.brand ?? null,
+    category: product.category,
+    purchase_date: product.purchaseDate?.toISOString() ?? null,
+    expiration_date: product.expirationDate.toISOString(),
+    opened_date: product.openedDate?.toISOString() ?? null,
+    pao_months: product.paoMonths ?? null,
+    location: product.location ?? null,
+    barcode: product.barcode ?? null,
+    photo_url: product.photoUrl ?? null,
+    usage_count: product.usageCount ?? 0,
+    notes: product.notes ?? null,
+  };
+}
+
+function productToUpdateRow(updates: Partial<Product>) {
+  const row: Record<string, unknown> = {};
+  if (updates.name !== undefined) row.name = updates.name;
+  if (updates.brand !== undefined) row.brand = updates.brand ?? null;
+  if (updates.category !== undefined) row.category = updates.category;
+  if (updates.purchaseDate !== undefined) {
+    row.purchase_date = updates.purchaseDate?.toISOString() ?? null;
+  }
+  if (updates.expirationDate !== undefined) {
+    row.expiration_date = updates.expirationDate.toISOString();
+  }
+  if (updates.openedDate !== undefined) {
+    row.opened_date = updates.openedDate?.toISOString() ?? null;
+  }
+  if (updates.paoMonths !== undefined) row.pao_months = updates.paoMonths ?? null;
+  if (updates.location !== undefined) row.location = updates.location ?? null;
+  if (updates.barcode !== undefined) row.barcode = updates.barcode ?? null;
+  if (updates.photoUrl !== undefined) row.photo_url = updates.photoUrl ?? null;
+  if (updates.usageCount !== undefined) row.usage_count = updates.usageCount ?? 0;
+  if (updates.notes !== undefined) row.notes = updates.notes ?? null;
+  return row;
+}
+
+/** Serialize Product for local storage (dates to ISO strings). */
 function productToStored(p: Product): Record<string, unknown> {
   return {
     ...p,
@@ -16,7 +105,6 @@ function productToStored(p: Product): Record<string, unknown> {
   };
 }
 
-/** Deserialize stored JSON back to Product (ISO strings to Date). */
 function storedToProduct(raw: Record<string, unknown>): Product {
   return {
     ...raw,
@@ -28,291 +116,202 @@ function storedToProduct(raw: Record<string, unknown>): Product {
   } as Product;
 }
 
-export async function loadProductsFromStorage(): Promise<Product[] | null> {
+async function loadProductsFromStorage(): Promise<Product[] | null> {
   try {
     const raw = await AsyncStorage.getItem(PRODUCTS_STORAGE_KEY);
     if (!raw) return null;
     const arr = JSON.parse(raw) as Record<string, unknown>[];
-    if (!Array.isArray(arr) || arr.length === 0) return null;
+    if (!Array.isArray(arr)) return null;
     return arr.map(storedToProduct);
   } catch {
     return null;
   }
 }
 
-export async function persistProducts(products: Product[]): Promise<void> {
+async function loadGuestProducts(): Promise<Product[]> {
+  const stored = await loadProductsFromStorage();
+  if (!stored?.length) return [];
+  return stored
+    .filter((p) => p.userId === GUEST_USER_ID || p.userId === LEGACY_DEMO_USER_ID)
+    .map((p) => ({ ...p, userId: GUEST_USER_ID }))
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+}
+
+async function saveGuestProducts(products: Product[]): Promise<void> {
+  const otherUsers = (await loadProductsFromStorage())?.filter(
+    (p) => p.userId !== GUEST_USER_ID && p.userId !== LEGACY_DEMO_USER_ID
+  );
+  const merged = [...(otherUsers ?? []), ...products];
+  if (merged.length === 0) {
+    await clearLocalProducts();
+    return;
+  }
+  await AsyncStorage.setItem(
+    PRODUCTS_STORAGE_KEY,
+    JSON.stringify(merged.map(productToStored))
+  );
+}
+
+async function clearLocalProducts(): Promise<void> {
+  await AsyncStorage.removeItem(PRODUCTS_STORAGE_KEY);
+}
+
+/** Remove seeded demo inventory from earlier builds (runs once per install). */
+export async function purgeLegacyDemoProductsIfNeeded(): Promise<void> {
   try {
-    const toStore = products.map(productToStored);
-    await AsyncStorage.setItem(PRODUCTS_STORAGE_KEY, JSON.stringify(toStore));
+    const purged = await AsyncStorage.getItem(DEMO_DATA_PURGED_KEY);
+    if (purged === 'true') return;
+
+    const stored = await loadProductsFromStorage();
+    if (stored?.length) {
+      const cleaned = stored.filter((p) => p.userId !== LEGACY_DEMO_USER_ID);
+      if (cleaned.length === 0) {
+        await clearLocalProducts();
+      } else {
+        await AsyncStorage.setItem(
+          PRODUCTS_STORAGE_KEY,
+          JSON.stringify(cleaned.map(productToStored))
+        );
+      }
+    }
+
+    await AsyncStorage.setItem(DEMO_DATA_PURGED_KEY, 'true');
   } catch {
-    // Silently ignore storage errors
+    // Non-fatal
   }
 }
 
-// Mock data for initial development / investor demo
-// TODO: Replace with real Supabase queries when ready
+/** Upload any on-device products created before sign-in, then clear local cache. */
+export async function migrateLocalProductsToCloud(userId: string): Promise<void> {
+  const migrated = await AsyncStorage.getItem(LOCAL_MIGRATED_KEY);
+  if (migrated === userId) return;
 
-/** Add days to today (at midnight) for stable demo dates relative to "now". */
-const daysFromNow = (days: number): Date => {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  d.setDate(d.getDate() + days);
-  return d;
-};
+  const local = await loadGuestProducts();
+  if (local?.length) {
+    const rows = local
+      .filter((p) => p.userId !== LEGACY_DEMO_USER_ID)
+      .map((p) =>
+        productToInsertRow(userId, {
+          name: p.name,
+          brand: p.brand,
+          category: p.category,
+          purchaseDate: p.purchaseDate,
+          expirationDate: p.expirationDate,
+          openedDate: p.openedDate,
+          paoMonths: p.paoMonths,
+          location: p.location,
+          barcode: p.barcode,
+          photoUrl: p.photoUrl,
+          usageCount: p.usageCount,
+          notes: p.notes,
+        })
+      );
 
-const now = new Date();
-const baseCreated = (daysAgo: number) => {
-  const d = new Date(now);
-  d.setDate(d.getDate() - daysAgo);
-  return d;
-};
+    if (rows.length > 0) {
+      const { error } = await supabase.from('products').insert(rows);
+      if (error) throw error;
+    }
+  }
 
-// Demo data: dates relative to today so "Expiring soon" and "Expired" always show correctly
-const mockProducts: Product[] = [
-  // —— EXPIRED (2) ——
-  {
-    id: '1',
-    userId: 'demo-user',
-    name: 'Niacinamide 10% + Zinc',
-    brand: 'The Ordinary',
-    category: 'skincare',
-    expirationDate: daysFromNow(-8),
-    purchaseDate: baseCreated(120),
-    openedDate: baseCreated(105),
-    paoMonths: 6,
-    location: 'Bathroom Cabinet',
-    photoUrl: 'https://images.unsplash.com/photo-1556228578-0d85b1a4d571?w=400',
-    usageCount: 42,
-    notes: 'Great for reducing pores and oil control',
-    createdAt: baseCreated(120),
-    updatedAt: baseCreated(120),
-  },
-  {
-    id: '2',
-    userId: 'demo-user',
-    name: 'Matte Lipstick',
-    brand: 'MAC Cosmetics',
-    category: 'makeup',
-    expirationDate: daysFromNow(-3),
-    purchaseDate: baseCreated(90),
-    openedDate: baseCreated(85),
-    paoMonths: 12,
-    location: 'Makeup Bag',
-    photoUrl: 'https://images.unsplash.com/photo-1583241800619-2d0d3e07b4c5?w=400',
-    usageCount: 25,
-    notes: 'Ruby Woo shade - favorite red',
-    createdAt: baseCreated(90),
-    updatedAt: baseCreated(90),
-  },
-  // —— EXPIRING SOON (within 30 days) ——
-  {
-    id: '3',
-    userId: 'demo-user',
-    name: 'Hyaluronic Acid 2% + B5',
-    brand: 'The Ordinary',
-    category: 'skincare',
-    expirationDate: daysFromNow(5),
-    purchaseDate: baseCreated(60),
-    openedDate: baseCreated(55),
-    paoMonths: 6,
-    location: 'Bathroom Cabinet',
-    photoUrl: 'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=400',
-    usageCount: 18,
-    notes: 'Apply on damp skin for best results',
-    createdAt: baseCreated(60),
-    updatedAt: baseCreated(60),
-  },
-  {
-    id: '4',
-    userId: 'demo-user',
-    name: 'Volume Mascara',
-    brand: "L'Oréal",
-    category: 'makeup',
-    expirationDate: daysFromNow(12),
-    purchaseDate: baseCreated(70),
-    openedDate: baseCreated(67),
-    paoMonths: 3,
-    location: 'Makeup Bag',
-    photoUrl: 'https://images.unsplash.com/photo-1631210867761-65e61b0eab3c?w=400',
-    usageCount: 60,
-    notes: 'Waterproof formula',
-    createdAt: baseCreated(70),
-    updatedAt: baseCreated(70),
-  },
-  {
-    id: '5',
-    userId: 'demo-user',
-    name: 'Repairing Shampoo',
-    brand: 'Olaplex',
-    category: 'haircare',
-    expirationDate: daysFromNow(18),
-    purchaseDate: baseCreated(80),
-    openedDate: baseCreated(75),
-    paoMonths: 12,
-    location: 'Shower',
-    photoUrl: 'https://images.unsplash.com/photo-1556228720-195a672e8a03?w=400',
-    usageCount: 35,
-    notes: 'For damaged hair - use weekly',
-    createdAt: baseCreated(80),
-    updatedAt: baseCreated(80),
-  },
-  {
-    id: '6',
-    userId: 'demo-user',
-    name: 'Cicaplast Baume B5',
-    brand: 'La Roche-Posay',
-    category: 'skincare',
-    expirationDate: daysFromNow(25),
-    purchaseDate: baseCreated(45),
-    openedDate: baseCreated(42),
-    paoMonths: 6,
-    location: 'Bathroom Cabinet',
-    photoUrl: 'https://images.unsplash.com/photo-1612817288484-6f916006741a?w=400',
-    usageCount: 22,
-    notes: 'Soothing repair balm',
-    createdAt: baseCreated(45),
-    updatedAt: baseCreated(45),
-  },
-  {
-    id: '7',
-    userId: 'demo-user',
-    name: 'Glow Recipe Watermelon Glow Niacinamide Dew Drops',
-    brand: 'Glow Recipe',
-    category: 'skincare',
-    expirationDate: daysFromNow(30),
-    purchaseDate: baseCreated(50),
-    openedDate: baseCreated(48),
-    paoMonths: 12,
-    location: 'Bathroom Shelf',
-    photoUrl: 'https://images.unsplash.com/photo-1571781926291-c477ebfd024b?w=400',
-    usageCount: 15,
-    notes: 'Lightweight serum for glow',
-    createdAt: baseCreated(50),
-    updatedAt: baseCreated(50),
-  },
-  // —— SAFE (rest) ——
-  {
-    id: '8',
-    userId: 'demo-user',
-    name: 'Vitamin C Brightening Serum',
-    brand: 'CeraVe',
-    category: 'skincare',
-    expirationDate: daysFromNow(90),
-    purchaseDate: baseCreated(30),
-    openedDate: baseCreated(26),
-    paoMonths: 6,
-    location: 'Bathroom Cabinet',
-    photoUrl: 'https://images.unsplash.com/photo-1571781926291-c477ebfd024b?w=400',
-    usageCount: 12,
-    notes: 'Use in morning routine',
-    createdAt: baseCreated(30),
-    updatedAt: baseCreated(30),
-  },
-  {
-    id: '9',
-    userId: 'demo-user',
-    name: 'Chance Eau de Parfum',
-    brand: 'Chanel',
-    category: 'fragrance',
-    expirationDate: daysFromNow(180),
-    purchaseDate: baseCreated(100),
-    openedDate: baseCreated(98),
-    paoMonths: 36,
-    location: 'Dresser Top',
-    photoUrl: 'https://images.unsplash.com/photo-1541643600914-78b084683601?w=400',
-    usageCount: 8,
-    notes: 'Evening wear',
-    createdAt: baseCreated(100),
-    updatedAt: baseCreated(100),
-  },
-  {
-    id: '10',
-    userId: 'demo-user',
-    name: 'Nourishing Hair Mask',
-    brand: 'Moroccanoil',
-    category: 'haircare',
-    expirationDate: daysFromNow(200),
-    purchaseDate: baseCreated(60),
-    openedDate: baseCreated(55),
-    paoMonths: 24,
-    location: 'Shower',
-    photoUrl: 'https://images.unsplash.com/photo-1522338242992-e1a54906a8da?w=400',
-    usageCount: 5,
-    notes: 'Deep conditioning treatment',
-    createdAt: baseCreated(60),
-    updatedAt: baseCreated(60),
-  },
-];
+  await clearLocalProducts();
+  await AsyncStorage.setItem(LOCAL_MIGRATED_KEY, userId);
+}
 
-// Convert date strings to Date objects for Supabase responses
-const convertProductDates = (product: any): Product => {
-  return {
-    ...product,
-    purchaseDate: product.purchase_date ? new Date(product.purchase_date) : undefined,
-    expirationDate: new Date(product.expiration_date),
-    openedDate: product.opened_date ? new Date(product.opened_date) : undefined,
-    createdAt: new Date(product.created_at),
-    updatedAt: new Date(product.updated_at),
-    category: product.category as Product['category'],
-    paoMonths: product.pao_months,
-    photoUrl: product.photo_url,
-    usageCount: product.usage_count,
-    userId: product.user_id,
-    barcode: product.barcode,
-    location: product.location,
-  };
-};
+export async function fetchProducts(userId: string): Promise<Product[]> {
+  await purgeLegacyDemoProductsIfNeeded();
 
-/**
- * Fetch all products for the current user
- * 
- * Supabase Query Example:
- * const { data, error } = await supabase
- *   .from('products')
- *   .select('*')
- *   .order('created_at', { ascending: false });
- * 
- * if (error) throw error;
- * return data.map(convertProductDates);
- */
-export const fetchProducts = async (): Promise<Product[]> => {
-  // TODO: Uncomment when Supabase is configured
-  // const { data, error } = await supabase
-  //   .from('products')
-  //   .select('*')
-  //   .order('created_at', { ascending: false });
-  // 
-  // if (error) throw error;
-  // return data ? data.map(convertProductDates) : [];
+  if (isGuestUserId(userId)) {
+    return loadGuestProducts();
+  }
 
-  // Demo: use persisted list if non-empty so user-added products survive restart
-  const stored = await loadProductsFromStorage();
-  if (stored && stored.length > 0) return stored;
-  return mockProducts;
-};
+  const { data, error } = await supabase
+    .from('products')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
 
-/**
- * Fetch recently added products (limit 3)
- * 
- * Supabase Query Example:
- * const { data, error } = await supabase
- *   .from('products')
- *   .select('*')
- *   .order('created_at', { ascending: false })
- *   .limit(3);
- */
-export const fetchRecentProducts = async (limit: number = 3): Promise<Product[]> => {
-  // TODO: Uncomment when Supabase is configured
-  // const { data, error } = await supabase
-  //   .from('products')
-  //   .select('*')
-  //   .order('created_at', { ascending: false })
-  //   .limit(limit);
-  // 
-  // if (error) throw error;
-  // return data ? data.map(convertProductDates) : [];
+  if (error) throw error;
+  return (data as ProductRow[] | null)?.map(rowToProduct) ?? [];
+}
 
-  // Mock implementation
-  const products = await fetchProducts();
+export async function fetchRecentProducts(userId: string, limit: number = 3): Promise<Product[]> {
+  const products = await fetchProducts(userId);
   return products.slice(0, limit);
-};
+}
+
+export async function createProduct(
+  userId: string,
+  product: Omit<Product, 'id' | 'userId' | 'createdAt' | 'updatedAt'>
+): Promise<Product> {
+  if (isGuestUserId(userId)) {
+    const now = new Date();
+    const newProduct: Product = {
+      ...product,
+      id: Crypto.randomUUID(),
+      userId: GUEST_USER_ID,
+      createdAt: now,
+      updatedAt: now,
+    };
+    const products = await loadGuestProducts();
+    products.unshift(newProduct);
+    await saveGuestProducts(products);
+    return newProduct;
+  }
+
+  const { data, error } = await supabase
+    .from('products')
+    .insert(productToInsertRow(userId, product))
+    .select('*')
+    .single();
+
+  if (error) throw error;
+  return rowToProduct(data as ProductRow);
+}
+
+export async function updateProductById(
+  userId: string,
+  id: string,
+  updates: Partial<Product>
+): Promise<Product> {
+  if (isGuestUserId(userId)) {
+    const products = await loadGuestProducts();
+    const index = products.findIndex((p) => p.id === id);
+    if (index === -1) throw new Error('Product not found');
+
+    const updated: Product = {
+      ...products[index],
+      ...updates,
+      updatedAt: new Date(),
+    };
+    products[index] = updated;
+    await saveGuestProducts(products);
+    return updated;
+  }
+
+  const { data, error } = await supabase
+    .from('products')
+    .update(productToUpdateRow(updates))
+    .eq('id', id)
+    .eq('user_id', userId)
+    .select('*')
+    .single();
+
+  if (error) throw error;
+  return rowToProduct(data as ProductRow);
+}
+
+export async function deleteProductById(userId: string, id: string): Promise<void> {
+  if (isGuestUserId(userId)) {
+    const products = await loadGuestProducts();
+    await saveGuestProducts(products.filter((p) => p.id !== id));
+    return;
+  }
+
+  const { error } = await supabase
+    .from('products')
+    .delete()
+    .eq('id', id)
+    .eq('user_id', userId);
+
+  if (error) throw error;
+}

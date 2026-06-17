@@ -11,7 +11,6 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { DEMO_MODE } from '../../config/demoMode';
 import { colors, spacing, radius, typography } from '../../theme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -34,9 +33,7 @@ const SLIDES: WelcomeSlide[] = [
     id: '2',
     icon: 'camera',
     title: 'Scan or add products',
-    subtitle: DEMO_MODE
-      ? 'Try scanning the barcode or product label on a demo product. If we cannot confirm it automatically, you can choose it and keep going.'
-      : 'Use barcode or camera to add items. Edit details, then save to your collection.',
+    subtitle: 'Use barcode or camera to add items. Edit details, then save to your collection.',
   },
   {
     id: '3',

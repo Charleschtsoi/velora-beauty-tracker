@@ -328,14 +328,14 @@ export default function AddProductScreen() {
           </Text>
         </View>
 
-        {/* Scan not found / error banner */}
+        {/* Product not in catalog — collaborative reminder */}
         {showScanNotFoundBanner && (
           <View style={styles.scanNotFoundBanner}>
-            <Ionicons name="information-circle" size={20} color="#10b981" />
+            <Ionicons name="information-circle" size={20} color="#059669" />
             <Text style={styles.scanNotFoundBannerText}>
               {DEMO_MODE
-                ? "We couldn't confirm this demo product automatically. You can edit the details below or try scanning again."
-                : "We couldn't find this product. You can edit the fields below or try another photo."}
+                ? "We couldn't confirm this demo product automatically. Please add the details below — your photo will be saved for your records."
+                : "We couldn't find this product in our database. Please help us add it below — take or keep a product photo for your shelf record."}
             </Text>
             <TouchableOpacity
               onPress={() => setShowScanNotFoundBanner(false)}
@@ -371,6 +371,11 @@ export default function AddProductScreen() {
 
         {/* Photo Uploader */}
         <View style={styles.photoSection}>
+          {showScanNotFoundBanner && !photoUri && (
+            <Text style={styles.photoHelper}>
+              A quick product photo helps you spot it on your shelf later — optional but nice to have.
+            </Text>
+          )}
           <PhotoUploader
             photoUri={photoUri}
             onPhotoSelected={setPhotoUri}
@@ -601,18 +606,21 @@ const styles = StyleSheet.create({
   scanNotFoundBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fef3c7',
+    backgroundColor: '#ecfdf5',
     paddingVertical: 10,
     paddingHorizontal: 14,
     borderRadius: 8,
     marginBottom: 16,
     gap: 10,
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
   },
   scanNotFoundBannerText: {
     flex: 1,
     fontSize: 14,
-    color: '#92400e',
+    color: '#065f46',
     fontWeight: '500',
+    lineHeight: 20,
   },
   scanNotFoundDismiss: {
     padding: 4,
@@ -626,6 +634,13 @@ const styles = StyleSheet.create({
   },
   photoSection: {
     marginBottom: 16,
+  },
+  photoHelper: {
+    fontSize: 14,
+    color: '#065f46',
+    lineHeight: 20,
+    marginBottom: 10,
+    fontWeight: '500',
   },
   fieldContainer: {
     marginBottom: 16,

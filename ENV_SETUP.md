@@ -38,4 +38,41 @@ supabase functions deploy lookup-product
 supabase functions deploy analyze-product-image
 ```
 
-See [docs/AI_SCANNING_ARCHITECTURE.md](docs/AI_SCANNING_ARCHITECTURE.md) for full deployment steps.
+## Auth (Google + Apple)
+
+Social login uses **Supabase Auth**. Products are stored in the `products` table, scoped to each user via Row Level Security.
+
+### 1. Run the database migration
+
+```bash
+supabase db push
+```
+
+This creates the `products` table and RLS policies.
+
+### 2. Supabase Dashboard → Authentication → Providers
+
+**Google**
+- Enable Google provider
+- Add OAuth client ID + secret from [Google Cloud Console](https://console.cloud.google.com/)
+- Under **Redirect URLs**, add:
+  - `velora://auth/callback`
+  - `https://auth.expo.io/@charlestsoi/velora` (for Expo Go dev only)
+
+**Apple**
+- Enable Apple provider
+- Add Apple Services ID, secret key, and team/bundle details from Apple Developer
+- Bundle ID: `com.velorascanner.app`
+
+### 3. Apple Developer
+
+- Enable **Sign in with Apple** on the App ID `com.velorascanner.app`
+- Rebuild the iOS app after auth changes (`eas build --platform ios --profile production`)
+
+### 4. Google Cloud (iOS + Android)
+
+- Create OAuth 2.0 client IDs for iOS (`com.velorascanner.app`) and Android (package + SHA-1)
+- Use the **Web client** credentials in Supabase Google provider settings
+
+---
+

@@ -10,7 +10,11 @@ import type { ImageSourcePropType } from 'react-native';
  * Until then, cards use icon + iconBackgroundColor for a visible visual.
  */
 export const summaryCardImages: Record<'expiring_soon' | 'expired' | 'in_collection', ImageSourcePropType | null> = {
-  expiring_soon: null,
-  expired: null,
-  in_collection: null,
+  expiring_soon: require('./expiring-soon.png'),
+  expired: require('./expired.png'),
+  in_collection: require('./in-collection.png'),
+};
+
+export const emptyStateImages = {
+  noProductsYet: require('./no-products-yet.png') as ImageSourcePropType,
 };
