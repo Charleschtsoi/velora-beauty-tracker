@@ -206,4 +206,72 @@ export const DEMO_PRODUCTS: DemoProductInput[] = [
         'Apply to clean skin morning and night after toner or serum, then seal with sunscreen in the daytime.',
     },
   },
+  {
+    id: 'demo_007_vecs_gardenia_airy_sunscreen',
+    name: 'Gardenia Airy Sunscreen SPF50+',
+    brand: 'VECs',
+    category: 'sunscreen',
+    volume: '50g',
+    expirationDate: '2028-03-31',
+    notes:
+      'Lightweight “airy” sunscreen designed for daily wear with high SPF protection. Shake gently before use.',
+    // This string is for future demo photo display; matching does not depend on it right now.
+    demoPhotoUri: "require('../assets/demo/vecs_gardenia_airy_sunscreen.jpg')",
+    matcherHints: {
+      primaryOcrCues: ['VECs', 'GARDENIA', 'AIRY', 'SUNSCREEN'],
+      secondaryOcrCues: ['SPF50+', 'PA', 'SKIN'],
+      packagingColor: 'glass-pink',
+    },
+    mockAiEnrichment: {
+      ingredientsSummary:
+        'An airy sunscreen texture that spreads easily, forming a protective film. Built for daily UV defense with a comfortable finish.',
+      routineAdvice:
+        'Use as your final step in the morning routine. Reapply after sweating, swimming, or towel-drying.',
+    },
+  },
+  {
+    id: 'demo_008_mild_eye_makeup_remover',
+    name: 'Mild Eye Makeup Remover',
+    brand: 'Mild',
+    category: 'makeup',
+    volume: '110ml',
+    expirationDate: '2027-10-31',
+    notes:
+      'Gentle eye makeup remover that lifts makeup without harsh rubbing. Best for daily use.',
+    demoPhotoUri: "require('../assets/demo/mild_eye_makeup_remover.jpg')",
+    matcherHints: {
+      primaryOcrCues: ['MILD', 'EYE MAKEUP REMOVER', 'EYE MAKEUP', 'REMOVER'],
+      secondaryOcrCues: ['110 mL', 'マイルド'],
+      packagingColor: 'clear',
+    },
+    mockAiEnrichment: {
+      ingredientsSummary:
+        'A mild, comfortable remover formulated to dissolve eye-area makeup while minimizing irritation from aggressive cleansing.',
+      routineAdvice:
+        'Apply to a cotton pad, hold briefly over eye makeup, then gently wipe. Follow with a regular facial cleanser.',
+    },
+  },
+  {
+    id: 'demo_009_skii_facial_treatment_clear_lotion',
+    name: 'Facial Treatment Clear Lotion',
+    brand: 'SK-II',
+    category: 'skincare',
+    volume: '30ml',
+    productionDate: '2024-01-01',
+    expirationDate: '2026-11-30',
+    notes:
+      'SK-II clear lotion for balanced, clean-feeling skin. Suitable for consistent daily use.',
+    demoPhotoUri: "require('../assets/demo/skii_clear_lotion.jpg')",
+    matcherHints: {
+      primaryOcrCues: ['SK-II', 'FACIAL TREATMENT', 'CLEAR LOTION'],
+      secondaryOcrCues: ['30mL', '無香', 'クリア'],
+      packagingColor: 'glass-silver',
+    },
+    mockAiEnrichment: {
+      ingredientsSummary:
+        'A clear lotion designed to support skin clarity with lightweight hydration and a refreshing finish for daily routines.',
+      routineAdvice:
+        'Apply after cleansing and before moisturizer, using a few smooth passes to help absorb effectively.',
+    },
+  },
 ];

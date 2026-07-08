@@ -180,6 +180,9 @@ export default function ScanScreen() {
     if (barcodeValue) {
       rememberAiSessionBarcode(barcodeValue);
     }
+    // When the user selects a demo product from the presenter picker, knownFieldsRef may not
+    // be primed yet. Prime it so the local (offline) AI photo matching has context.
+    primeKnownFieldsFromDemo(product);
     setScanMode('ai');
     setIsScanning(true);
     setScanned(false);
