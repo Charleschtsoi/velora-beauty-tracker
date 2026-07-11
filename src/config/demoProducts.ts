@@ -232,23 +232,24 @@ export const DEMO_PRODUCTS: DemoProductInput[] = [
   {
     id: 'demo_008_mild_eye_makeup_remover',
     name: 'Mild Eye Makeup Remover',
-    brand: 'Mild',
+    brand: 'MUJI',
     category: 'makeup',
     volume: '110ml',
     expirationDate: '2027-10-31',
     notes:
-      'Gentle eye makeup remover that lifts makeup without harsh rubbing. Best for daily use.',
+      'MUJI gentle eye makeup remover; fragrance-free, mineral-oil-free, paraben-free, and alcohol-free. Shake well before use.',
     demoPhotoUri: "require('../assets/demo/mild_eye_makeup_remover.jpg')",
+    barcode: '4547315859696',
     matcherHints: {
-      primaryOcrCues: ['MILD', 'EYE MAKEUP REMOVER', 'EYE MAKEUP', 'REMOVER'],
-      secondaryOcrCues: ['110 mL', 'マイルド'],
+      primaryOcrCues: ['MUJI', '無印良品', 'MILD', 'EYE MAKEUP REMOVER'],
+      secondaryOcrCues: ['110ml', '110 mL', 'マイルド', '15859696'],
       packagingColor: 'clear',
     },
     mockAiEnrichment: {
       ingredientsSummary:
-        'A mild, comfortable remover formulated to dissolve eye-area makeup while minimizing irritation from aggressive cleansing.',
+        'A MUJI eye makeup remover with olive squalane, chamomile extract, peach leaf extract, and hyaluronic acid to dissolve eye makeup while staying gentle on sensitive skin.',
       routineAdvice:
-        'Apply to a cotton pad, hold briefly over eye makeup, then gently wipe. Follow with a regular facial cleanser.',
+        'Shake well, apply a coin-sized amount to a cotton pad, hold on the eyelid for a few seconds, then gently wipe. Follow with your regular cleanser.',
     },
   },
   {

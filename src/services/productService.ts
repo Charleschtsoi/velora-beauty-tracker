@@ -21,6 +21,7 @@ type ProductRow = {
   pao_months: number | null;
   location: string | null;
   barcode: string | null;
+  price: number | null;
   photo_url: string | null;
   usage_count: number | null;
   notes: string | null;
@@ -41,6 +42,7 @@ function rowToProduct(row: ProductRow): Product {
     paoMonths: row.pao_months ?? undefined,
     location: row.location ?? undefined,
     barcode: row.barcode ?? undefined,
+    price: row.price ?? undefined,
     photoUrl: row.photo_url ?? undefined,
     usageCount: row.usage_count ?? undefined,
     notes: row.notes ?? undefined,
@@ -64,6 +66,7 @@ function productToInsertRow(
     pao_months: product.paoMonths ?? null,
     location: product.location ?? null,
     barcode: product.barcode ?? null,
+    price: product.price ?? null,
     photo_url: product.photoUrl ?? null,
     usage_count: product.usageCount ?? 0,
     notes: product.notes ?? null,
@@ -87,6 +90,7 @@ function productToUpdateRow(updates: Partial<Product>) {
   if (updates.paoMonths !== undefined) row.pao_months = updates.paoMonths ?? null;
   if (updates.location !== undefined) row.location = updates.location ?? null;
   if (updates.barcode !== undefined) row.barcode = updates.barcode ?? null;
+  if (updates.price !== undefined) row.price = updates.price ?? null;
   if (updates.photoUrl !== undefined) row.photo_url = updates.photoUrl ?? null;
   if (updates.usageCount !== undefined) row.usage_count = updates.usageCount ?? 0;
   if (updates.notes !== undefined) row.notes = updates.notes ?? null;
@@ -201,6 +205,7 @@ export async function migrateLocalProductsToCloud(userId: string): Promise<void>
           paoMonths: p.paoMonths,
           location: p.location,
           barcode: p.barcode,
+          price: p.price,
           photoUrl: p.photoUrl,
           usageCount: p.usageCount,
           notes: p.notes,

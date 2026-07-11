@@ -111,6 +111,7 @@ export default function ProductDetailScreen() {
   const [photoUri, setPhotoUri] = useState<string | undefined>();
   const [expirationDate, setExpirationDate] = useState<Date | undefined>();
   const [purchaseDate, setPurchaseDate] = useState<Date | undefined>();
+  const [price, setPrice] = useState('');
   const [quantity, setQuantity] = useState(1);
   const [notes, setNotes] = useState('');
 
@@ -124,6 +125,7 @@ export default function ProductDetailScreen() {
       setPhotoUri(product.photoUrl);
       setExpirationDate(product.expirationDate);
       setPurchaseDate(product.purchaseDate);
+      setPrice(product.price != null ? String(product.price) : '');
       setQuantity(product.usageCount || 1);
       setNotes(product.notes || '');
     }
@@ -144,6 +146,14 @@ export default function ProductDetailScreen() {
   const daysUntil = getDaysUntilExpiration(product.expirationDate);
   const statusConfig = getStatusConfig(status, daysUntil);
 
+  const parsePriceInput = (value: string): number | undefined => {
+    const trimmed = value.trim();
+    if (!trimmed) return undefined;
+    const parsed = Number(trimmed);
+    if (!Number.isFinite(parsed) || parsed < 0) return undefined;
+    return parsed;
+  };
+
   const handleSave = async () => {
     if (!productName.trim()) {
       Alert.alert('Validation Error', 'Product name is required.');
@@ -152,6 +162,11 @@ export default function ProductDetailScreen() {
 
     if (!expirationDate) {
       Alert.alert('Validation Error', 'Expiration date is required.');
+      return;
+    }
+
+    if (price.trim() && parsePriceInput(price) === undefined) {
+      Alert.alert('Validation Error', 'Enter a valid price (0 or greater).');
       return;
     }
 
@@ -165,6 +180,7 @@ export default function ProductDetailScreen() {
         photoUrl: photoUri,
         expirationDate,
         purchaseDate,
+        price: parsePriceInput(price),
         usageCount: quantity,
         notes: notes.trim() || undefined,
         openedDate: product.openedDate,
@@ -454,6 +470,29 @@ export default function ProductDetailScreen() {
           )
         )}
 
+        {/* Price */}
+        {isEditMode ? (
+          <View style={styles.fieldContainer}>
+            <Text style={styles.label}>Price (optional)</Text>
+            <TextInput
+              style={styles.input}
+              value={price}
+              onChangeText={setPrice}
+              placeholder="e.g. 68"
+              placeholderTextColor="#9ca3af"
+              keyboardType="decimal-pad"
+              testID="price-input"
+            />
+          </View>
+        ) : (
+          product.price != null && (
+            <View style={styles.fieldContainer}>
+              <Text style={styles.label}>Price</Text>
+              <Text style={styles.value}>${product.price.toFixed(2)}</Text>
+            </View>
+          )
+        )}
+
         {/* Quantity */}
         {isEditMode ? (
           <View style={styles.fieldContainer}>
@@ -529,6 +568,7 @@ export default function ProductDetailScreen() {
                   setPhotoUri(product.photoUrl);
                   setExpirationDate(product.expirationDate);
                   setPurchaseDate(product.purchaseDate);
+                  setPrice(product.price != null ? String(product.price) : '');
                   setQuantity(product.usageCount || 1);
                   setNotes(product.notes || '');
                 }

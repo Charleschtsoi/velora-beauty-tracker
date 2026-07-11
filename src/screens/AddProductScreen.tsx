@@ -15,7 +15,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { useProducts } from '../context/ProductContext';
 import { ProductCategory } from '../types/product.types';
-import { DEMO_MODE } from '../config/demoMode';
+import { showcaseCopy } from '../copy/showcaseCopy';
 import PhotoUploader from '../components/common/PhotoUploader';
 import DatePickerField from '../components/common/DatePickerField';
 import DropdownSelect from '../components/common/DropdownSelect';
@@ -91,6 +91,7 @@ export default function AddProductScreen() {
   const [photoUri, setPhotoUri] = useState<string | undefined>();
   const [expirationDate, setExpirationDate] = useState<Date | undefined>();
   const [purchaseDate, setPurchaseDate] = useState<Date | undefined>();
+  const [price, setPrice] = useState('');
   const [quantity, setQuantity] = useState(1);
   const [notes, setNotes] = useState('');
 
@@ -108,6 +109,7 @@ export default function AddProductScreen() {
     setPhotoUri(undefined);
     setExpirationDate(undefined);
     setPurchaseDate(undefined);
+    setPrice('');
     setQuantity(1);
     setNotes('');
     setErrors({});
@@ -234,6 +236,14 @@ export default function AddProductScreen() {
     );
   };
 
+  const parsePriceInput = (value: string): number | undefined => {
+    const trimmed = value.trim();
+    if (!trimmed) return undefined;
+    const parsed = Number(trimmed);
+    if (!Number.isFinite(parsed) || parsed < 0) return undefined;
+    return parsed;
+  };
+
   const validateForm = (): boolean => {
     const newErrors: { [key: string]: string } = {};
 
@@ -243,6 +253,10 @@ export default function AddProductScreen() {
 
     if (!expirationDate) {
       newErrors.expirationDate = 'Expiration date is required';
+    }
+
+    if (price.trim() && parsePriceInput(price) === undefined) {
+      newErrors.price = 'Enter a valid price (0 or greater)';
     }
 
     setErrors(newErrors);
@@ -264,6 +278,7 @@ export default function AddProductScreen() {
         barcode: barcode.trim() || undefined,
         expirationDate: expirationDate!,
         purchaseDate,
+        price: parsePriceInput(price),
         photoUrl: photoUri,
         notes: notes.trim() || undefined,
         usageCount: quantity,
@@ -333,9 +348,7 @@ export default function AddProductScreen() {
           <View style={styles.scanNotFoundBanner}>
             <Ionicons name="information-circle" size={20} color="#059669" />
             <Text style={styles.scanNotFoundBannerText}>
-              {DEMO_MODE
-                ? "We couldn't confirm this demo product automatically. Please add the details below — your photo will be saved for your records."
-                : "We couldn't find this product in our database. Please help us add it below — take or keep a product photo for your shelf record."}
+              {showcaseCopy.scanNotFoundBanner}
             </Text>
             <TouchableOpacity
               onPress={() => setShowScanNotFoundBanner(false)}
@@ -362,9 +375,7 @@ export default function AddProductScreen() {
           <View style={styles.aiIndicator}>
             <Ionicons name="sparkles" size={20} color="#10b981" />
             <Text style={styles.aiIndicatorText}>
-              {DEMO_MODE
-                ? 'Demo scan pre-filled the details it could confirm.'
-                : 'AI-extracted data • Please review and edit as needed'}
+              {showcaseCopy.aiPrefillBanner}
             </Text>
           </View>
         )}
@@ -488,6 +499,28 @@ export default function AddProductScreen() {
           testID="purchase-date-picker"
           maximumDate={new Date()}
         />
+
+        {/* Price */}
+        <View style={styles.fieldContainer}>
+          <Text style={styles.label}>Price (optional)</Text>
+          <TextInput
+            style={[styles.input, errors.price && styles.inputError]}
+            value={price}
+            onChangeText={(text) => {
+              setPrice(text);
+              if (errors.price) {
+                setErrors({ ...errors, price: '' });
+              }
+            }}
+            placeholder="e.g. 68"
+            placeholderTextColor="#9ca3af"
+            keyboardType="decimal-pad"
+            testID="price-input"
+          />
+          {errors.price && (
+            <Text style={styles.errorText}>{errors.price}</Text>
+          )}
+        </View>
 
         {/* Quantity */}
         <View style={styles.fieldContainer}>

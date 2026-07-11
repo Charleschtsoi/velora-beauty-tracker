@@ -4,8 +4,6 @@
 
 export const scanCameraCopy = {
   idleHeadline: 'Add a product in seconds',
-  idleSubcopyDemo:
-    'Scan a demo barcode or capture the label—Velora fills in the details for you.',
   idleSubcopyLive:
     'Prefer a flat box? Scan the barcode. Tubes and jars love a quick label photo.',
   idleTips: [

@@ -46,6 +46,7 @@ import {
 import { onProductSaved } from '../services/localNotificationService';
 import { colors, spacing, radius, shadow, typography } from '../theme';
 import { scanCameraCopy, truncateBarcodeForDisplay, normalizeCaptureError } from '../copy/scanCamera';
+import { getPresenterPickerCopy, showcaseCopy } from '../copy/showcaseCopy';
 import { ScanCameraHint } from '../components/scan/ScanCameraHint';
 
 const { width, height } = Dimensions.get('window');
@@ -151,20 +152,16 @@ export default function ScanScreen() {
     setPendingDemoContext({});
   };
 
-  const presenterPickerCopy =
-    pendingDemoContext.source === 'barcode'
-      ? "We couldn't confirm this barcode automatically. Choose the matching demo product below."
-      : pendingDemoContext.source === 'ai'
-        ? pendingDemoContext.detectedSummary
-          ? `We read “${pendingDemoContext.detectedSummary}” on the label. Choose the closest match below.`
-          : "We couldn't confirm this product label automatically. Choose the closest demo product below."
-        : 'Choose one of the demo products below to keep moving through the demo.';
+  const presenterPickerCopy = getPresenterPickerCopy(
+    pendingDemoContext.source,
+    pendingDemoContext.detectedSummary
+  );
 
   const handlePresenterSelect = async (productId: string) => {
     const resolved = resolveDemoProductManually(productId);
     closePresenterPicker();
     if (!resolved.product) {
-      showToast('Unable to load that demo product.', 'error');
+      showToast(showcaseCopy.toastProductLoadFailed, 'error');
       return;
     }
     if (pendingDemoContext.photoUri) {
@@ -272,32 +269,32 @@ export default function ScanScreen() {
         barcode: options?.barcode ?? demo.barcode,
         photoUri: options?.photoUri,
         aiData: {
-          name: { value: demo.name, confidence: 0.92, source: 'Demo' },
-          brand: { value: demo.brand ?? null, confidence: 0.92, source: 'Demo' },
+          name: { value: demo.name, confidence: 0.92, source: showcaseCopy.fieldSourceCatalog },
+          brand: { value: demo.brand ?? null, confidence: 0.92, source: showcaseCopy.fieldSourceCatalog },
           category: {
             value: demo.category === 'sunscreen' ? 'skincare' : demo.category,
             confidence: 0.92,
-            source: 'Demo',
+            source: showcaseCopy.fieldSourceCatalog,
           },
           packagingColor: {
             value: demo.matcherHints.packagingColor,
             confidence: 0.9,
-            source: 'Demo',
+            source: showcaseCopy.fieldSourceCatalog,
           },
           expirationDate: {
             value: demo.expirationDate,
             confidence: 0.92,
-            source: 'Demo',
+            source: showcaseCopy.fieldSourceCatalog,
           },
           notes: {
             value: `${demo.notes} Routine advice: ${demo.mockAiEnrichment.routineAdvice}`,
             confidence: 0.92,
-            source: 'Demo',
+            source: showcaseCopy.fieldSourceCatalog,
           },
           ingredients: {
             value: demo.mockAiEnrichment.ingredientsSummary,
             confidence: 0.92,
-            source: 'Demo',
+            source: showcaseCopy.fieldSourceCatalog,
           },
         },
       });
@@ -855,7 +852,7 @@ export default function ScanScreen() {
           if (detectedSummary) {
             showToast(`Read: ${detectedSummary}. Pick the closest match.`, 'info');
           } else if (barcodeHint) {
-            showToast(`Barcode ${barcodeHint} did not match our demo catalog.`, 'info');
+            showToast(showcaseCopy.toastBarcodeCatalogMiss(barcodeHint), 'info');
           } else {
             showToast("We couldn't identify this product yet.", 'info');
           }
@@ -1018,8 +1015,8 @@ export default function ScanScreen() {
       >
         <View style={styles.presenterModalBackdrop}>
           <View style={styles.presenterModalCard}>
-            <Text style={styles.presenterModalEyebrow}>Demo products</Text>
-            <Text style={styles.presenterModalTitle}>Choose demo product</Text>
+            <Text style={styles.presenterModalEyebrow}>{showcaseCopy.pickerEyebrow}</Text>
+            <Text style={styles.presenterModalTitle}>{showcaseCopy.pickerTitle}</Text>
             <Text style={styles.presenterModalCopy}>{presenterPickerCopy}</Text>
             <ScrollView
               style={styles.presenterList}
@@ -1050,11 +1047,6 @@ export default function ScanScreen() {
           </View>
         </View>
       </Modal>
-      {DEMO_MODE && (
-        <View style={styles.demoBadge}>
-          <Text style={styles.demoBadgeText}>Demo mode</Text>
-        </View>
-      )}
       {isAddingDemo && (
         <View style={styles.thinkingOverlay}>
           <ActivityIndicator size="large" color={colors.white} />
@@ -1249,7 +1241,7 @@ export default function ScanScreen() {
             </View>
             <Text style={styles.idleHeadline}>{scanCameraCopy.idleHeadline}</Text>
             <Text style={styles.idleSubcopy}>
-              {DEMO_MODE ? scanCameraCopy.idleSubcopyDemo : scanCameraCopy.idleSubcopyLive}
+              {DEMO_MODE ? showcaseCopy.idleSubcopy : scanCameraCopy.idleSubcopyLive}
             </Text>
             <View style={styles.tipsWrap}>
               {scanCameraCopy.idleTips.map((tip) => (
@@ -1360,8 +1352,8 @@ export default function ScanScreen() {
             activeOpacity={0.8}
             testID="choose-demo-product-button"
           >
-            <Ionicons name="sparkles-outline" size={18} color={colors.primary} />
-            <Text style={styles.demoChooserButtonText}>Choose from demo products</Text>
+            <Ionicons name="search-outline" size={18} color={colors.primary} />
+            <Text style={styles.demoChooserButtonText}>{showcaseCopy.browseCatalogButton}</Text>
           </TouchableOpacity>
         )}
 

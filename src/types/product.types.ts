@@ -14,6 +14,7 @@ export interface Product {
   // Storage & Organization
   location?: string; // e.g., "Bathroom Cabinet", "Bedroom Drawer"
   barcode?: string;
+  price?: number;
   
   // Media
   photoUrl?: string;
