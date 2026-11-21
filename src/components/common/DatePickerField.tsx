@@ -11,6 +11,10 @@ interface DatePickerFieldProps {
   placeholder?: string;
   required?: boolean;
   highlighted?: boolean;
+  /** Validation error — red border takes precedence. */
+  error?: boolean;
+  /** Low/unknown AI confidence — amber border when no error. */
+  uncertain?: boolean;
   testID?: string;
   minimumDate?: Date;
   maximumDate?: Date;
@@ -23,6 +27,8 @@ export default function DatePickerField({
   placeholder = 'Select date',
   required = false,
   highlighted = false,
+  error = false,
+  uncertain = false,
   testID,
   minimumDate,
   maximumDate,
@@ -64,7 +70,9 @@ export default function DatePickerField({
         style={[
           styles.dateInput,
           highlighted && styles.highlighted,
-          value && styles.hasValue,
+          value && !error && !uncertain && styles.hasValue,
+          uncertain && !error && styles.uncertain,
+          error && styles.inputError,
         ]}
         onPress={() => {
           setTempDate(value || new Date());
@@ -155,6 +163,14 @@ const styles = StyleSheet.create({
   },
   hasValue: {
     borderColor: '#10b981',
+  },
+  uncertain: {
+    borderColor: '#d97706',
+    backgroundColor: '#fffbeb',
+  },
+  inputError: {
+    borderColor: '#ef4444',
+    backgroundColor: '#fef2f2',
   },
   dateText: {
     fontSize: 16,

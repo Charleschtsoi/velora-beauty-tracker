@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -10,7 +10,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { useProducts } from '../context/ProductContext';
@@ -24,13 +24,21 @@ import type { AIFieldMap, AIFieldKey } from '../services/aiService';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { onProductSaved } from '../services/localNotificationService';
 import { typography } from '../theme';
+import {
+  buildReviewSummary,
+  confidenceBandLabel,
+  fieldNeedsReview,
+  getConfidenceBand,
+} from '../utils/fieldConfidence';
+import { parsePriceInput, validateAddProductForm } from '../utils/addProductValidation';
+import { toUserFacingSaveError } from '../utils/userFacingErrors';
 
 type AddProductRouteProp = RouteProp<RootStackParamList, 'AddProduct'>;
 
 // Helper function to map AI category to ProductCategory enum
 const mapAICategoryToEnum = (aiCategory?: string): ProductCategory => {
   if (!aiCategory) return ProductCategory.SKINCARE;
-  
+
   const normalized = aiCategory.toLowerCase().trim();
   switch (normalized) {
     case 'skincare':
@@ -82,6 +90,11 @@ export default function AddProductScreen() {
   const navigation = useNavigation<AddProductNavigationProp>();
   const route = useRoute<AddProductRouteProp>();
   const { addProduct } = useProducts();
+  const scrollRef = useRef<ScrollView>(null);
+  const nameFieldY = useRef(0);
+  const expiryFieldY = useRef(0);
+  const priceFieldY = useRef(0);
+  const prefillsAppliedRef = useRef(false);
 
   // Form state
   const [productName, setProductName] = useState('');
@@ -100,22 +113,7 @@ export default function AddProductScreen() {
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [fieldSources, setFieldSources] = useState<Record<AIFieldKey, FieldSourceInfo>>(initialFieldSources);
   const [showScanNotFoundBanner, setShowScanNotFoundBanner] = useState(Boolean(route.params?.scanNotFound));
-
-  const resetForm = useCallback(() => {
-    setProductName('');
-    setBrand('');
-    setCategory(ProductCategory.SKINCARE);
-    setBarcode('');
-    setPhotoUri(undefined);
-    setExpirationDate(undefined);
-    setPurchaseDate(undefined);
-    setPrice('');
-    setQuantity(1);
-    setNotes('');
-    setErrors({});
-    setFieldSources(initialFieldSources);
-    setShowScanNotFoundBanner(false);
-  }, []);
+  const [cameFromScan, setCameFromScan] = useState(false);
 
   const mergeNotes = useCallback((incoming: string | null) => {
     if (!incoming) return;
@@ -186,6 +184,13 @@ export default function AddProductScreen() {
     const params = route.params;
     if (!params) return;
 
+    const fromScan = Boolean(
+      params.aiData || params.upcData || params.aiFlatData || params.barcode || params.scanNotFound || params.photoUri,
+    );
+    if (fromScan) {
+      setCameFromScan(true);
+    }
+
     if (params.scanNotFound) {
       setShowScanNotFoundBanner(true);
     }
@@ -218,54 +223,95 @@ export default function AddProductScreen() {
     }
   }, [route.params, applyIncomingFields]);
 
-  useFocusEffect(
-    useCallback(() => {
-      applyRouteParams();
-    }, [applyRouteParams])
-  );
+  // Apply scan prefills once so returning to this screen does not overwrite edits.
+  useEffect(() => {
+    if (prefillsAppliedRef.current) return;
+    prefillsAppliedRef.current = true;
+    applyRouteParams();
+  }, [applyRouteParams]);
+
+  const reviewSummary = useMemo(() => {
+    if (!cameFromScan) return null;
+    return buildReviewSummary([
+      {
+        key: 'name',
+        label: 'Product name',
+        hasValue: Boolean(productName.trim()),
+        confidence: fieldSources.name?.confidence,
+      },
+      {
+        key: 'brand',
+        label: 'Brand',
+        hasValue: Boolean(brand.trim()),
+        confidence: fieldSources.brand?.confidence,
+      },
+      {
+        key: 'category',
+        label: 'Category',
+        hasValue: Boolean(fieldSources.category),
+        confidence: fieldSources.category?.confidence,
+      },
+      {
+        key: 'expirationDate',
+        label: 'Expiration date',
+        hasValue: Boolean(expirationDate),
+        confidence: fieldSources.expirationDate?.confidence,
+      },
+    ]);
+  }, [cameFromScan, productName, brand, expirationDate, fieldSources]);
+
+  const isUncertain = (field: AIFieldKey): boolean => {
+    const info = fieldSources[field];
+    if (!info || info.source === 'Manual') return false;
+    return fieldNeedsReview(info.confidence);
+  };
 
   const renderSourceTag = (field: AIFieldKey) => {
     const info = fieldSources[field];
     if (!info) return null;
-    const lowConfidence = info.confidence !== null && info.confidence < 0.6;
+    const band = getConfidenceBand(info.confidence);
+    const needsCheck = info.source !== 'Manual' && fieldNeedsReview(info.confidence);
     return (
-      <Text style={[styles.sourceTag, lowConfidence && styles.sourceTagLow]}>
-        Source: {info.source}
-        {info.confidence !== null ? ` (${info.confidence.toFixed(2)})` : ''}
+      <Text
+        style={[styles.sourceTag, needsCheck && styles.sourceTagLow]}
+        testID={`source-tag-${field}`}
+      >
+        {info.source === 'Manual'
+          ? 'Edited manually'
+          : `${info.source} · ${confidenceBandLabel(band)}`}
       </Text>
     );
   };
 
-  const parsePriceInput = (value: string): number | undefined => {
-    const trimmed = value.trim();
-    if (!trimmed) return undefined;
-    const parsed = Number(trimmed);
-    if (!Number.isFinite(parsed) || parsed < 0) return undefined;
-    return parsed;
+  const scrollToFirstError = (nextErrors: { [key: string]: string }) => {
+    const y =
+      nextErrors.productName
+        ? nameFieldY.current
+        : nextErrors.expirationDate
+          ? expiryFieldY.current
+          : nextErrors.price
+            ? priceFieldY.current
+            : 0;
+    scrollRef.current?.scrollTo({ y: Math.max(0, y - 24), animated: true });
   };
 
   const validateForm = (): boolean => {
-    const newErrors: { [key: string]: string } = {};
-
-    if (!productName.trim()) {
-      newErrors.productName = 'Product name is required';
+    const result = validateAddProductForm({
+      productName,
+      expirationDate,
+      price,
+    });
+    setErrors(result.errors);
+    if (!result.valid) {
+      Alert.alert('Almost ready', result.alertMessage ?? 'Please fix the highlighted fields.');
+      scrollToFirstError(result.errors);
+      return false;
     }
-
-    if (!expirationDate) {
-      newErrors.expirationDate = 'Expiration date is required';
-    }
-
-    if (price.trim() && parsePriceInput(price) === undefined) {
-      newErrors.price = 'Enter a valid price (0 or greater)';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    return true;
   };
 
   const handleSave = async () => {
     if (!validateForm()) {
-      Alert.alert('Validation Error', 'Please fill in all required fields.');
       return;
     }
 
@@ -290,12 +336,7 @@ export default function AddProductScreen() {
       showToast('Product added successfully!', 'success');
       navigation.replace('ProductDetail', { productId: newProduct.id });
     } catch (error) {
-      showToast(
-        error instanceof Error
-          ? error.message
-          : 'Failed to save product. Please try again.',
-        'error'
-      );
+      showToast(toUserFacingSaveError(error), 'error');
     } finally {
       setSaving(false);
     }
@@ -309,6 +350,13 @@ export default function AddProductScreen() {
 
   const handleQuantityIncrease = () => {
     setQuantity(quantity + 1);
+  };
+
+  const markManual = (key: AIFieldKey, hasValue: boolean) => {
+    setFieldSources((prev) => ({
+      ...prev,
+      [key]: hasValue ? { source: 'Manual', confidence: null } : prev[key],
+    }));
   };
 
   return (
@@ -332,9 +380,11 @@ export default function AddProductScreen() {
       </View>
 
       <ScrollView
+        ref={scrollRef}
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
         {/* Value copy: set expectation for reminders */}
         <View style={styles.reminderBanner}>
@@ -360,8 +410,37 @@ export default function AddProductScreen() {
           </View>
         )}
 
+        {/* Honest review summary for scan / AI prefills */}
+        {reviewSummary && (
+          <View
+            style={[
+              styles.reviewSummary,
+              reviewSummary.needsReviewCount > 0 || reviewSummary.missingCritical.length > 0
+                ? styles.reviewSummaryCaution
+                : styles.reviewSummaryCalm,
+            ]}
+            testID="review-summary"
+          >
+            <Ionicons
+              name={reviewSummary.needsReviewCount > 0 ? 'alert-circle' : 'checkmark-circle'}
+              size={22}
+              color={reviewSummary.needsReviewCount > 0 ? '#b45309' : '#047857'}
+            />
+            <View style={styles.reviewSummaryCopy}>
+              <Text style={styles.reviewSummaryHeadline}>{reviewSummary.headline}</Text>
+              <Text style={styles.reviewSummaryDetail}>{reviewSummary.detail}</Text>
+              <Text style={styles.reviewSummaryMeta}>
+                {reviewSummary.filledCount} pre-filled
+                {reviewSummary.needsReviewCount > 0
+                  ? ` · ${reviewSummary.needsReviewCount} to double-check`
+                  : ''}
+              </Text>
+            </View>
+          </View>
+        )}
+
         {/* Barcode Data Indicator */}
-        {route.params?.upcData && (
+        {route.params?.upcData && !reviewSummary && (
           <View style={styles.barcodeIndicator}>
             <Ionicons name="barcode-outline" size={20} color="#2563eb" />
             <Text style={styles.barcodeIndicatorText}>
@@ -370,8 +449,8 @@ export default function AddProductScreen() {
           </View>
         )}
 
-        {/* AI Data Indicator */}
-        {route.params?.aiData && (
+        {/* AI Data Indicator (shown only when review summary is not) */}
+        {route.params?.aiData && !reviewSummary && (
           <View style={styles.aiIndicator}>
             <Ionicons name="sparkles" size={20} color="#10b981" />
             <Text style={styles.aiIndicatorText}>
@@ -396,19 +475,28 @@ export default function AddProductScreen() {
         </View>
 
         {/* Product Name */}
-        <View style={styles.fieldContainer}>
+        <View
+          style={styles.fieldContainer}
+          onLayout={(e) => {
+            nameFieldY.current = e.nativeEvent.layout.y;
+          }}
+        >
           <Text style={styles.label}>
             Product Name <Text style={styles.required}>*</Text>
           </Text>
           <TextInput
-            style={[styles.input, errors.productName && styles.inputError]}
+            style={[
+              styles.input,
+              isUncertain('name') && !errors.productName && styles.inputUncertain,
+              errors.productName && styles.inputError,
+            ]}
             value={productName}
             onChangeText={(text) => {
               setProductName(text);
               if (errors.productName) {
                 setErrors({ ...errors, productName: '' });
               }
-              setFieldSources((prev) => ({ ...prev, name: text ? { source: 'Manual', confidence: null } : prev.name }));
+              markManual('name', Boolean(text));
             }}
             placeholder="Enter product name"
             placeholderTextColor="#9ca3af"
@@ -424,11 +512,14 @@ export default function AddProductScreen() {
         <View style={styles.fieldContainer}>
           <Text style={styles.label}>Brand</Text>
           <TextInput
-            style={styles.input}
+            style={[
+              styles.input,
+              isUncertain('brand') && styles.inputUncertain,
+            ]}
             value={brand}
             onChangeText={(text) => {
               setBrand(text);
-              setFieldSources((prev) => ({ ...prev, brand: text ? { source: 'Manual', confidence: null } : prev.brand }));
+              markManual('brand', Boolean(text));
             }}
             placeholder="e.g. CeraVe, The Ordinary"
             placeholderTextColor="#9ca3af"
@@ -444,7 +535,7 @@ export default function AddProductScreen() {
           value={category}
           onValueChange={(value) => {
             setCategory(value as ProductCategory);
-            setFieldSources((prev) => ({ ...prev, category: { source: 'Manual', confidence: null } }));
+            markManual('category', true);
           }}
           placeholder="Select category"
           testID="category-dropdown"
@@ -470,25 +561,35 @@ export default function AddProductScreen() {
           </View>
         </View>
 
-        {/* Expiration Date */}
-        <DatePickerField
-          label="Expiration Date"
-          value={expirationDate}
-          onDateChange={(date) => {
-            setExpirationDate(date);
-            setFieldSources((prev) => ({ ...prev, expirationDate: { source: 'Manual', confidence: null } }));
+        {/* Expiration Date — no minimumDate so AI-extracted past dates remain editable */}
+        <View
+          onLayout={(e) => {
+            expiryFieldY.current = e.nativeEvent.layout.y;
           }}
-          placeholder="Select expiration date"
-          required
-          highlighted
-          testID="expiration-date-picker"
-          minimumDate={new Date()}
-        />
-        <Text style={styles.expiryHelper}>We'll remind you 1 day before.</Text>
-        {renderSourceTag('expirationDate')}
-        {errors.expirationDate && (
-          <Text style={styles.errorText}>{errors.expirationDate}</Text>
-        )}
+        >
+          <DatePickerField
+            label="Expiration Date"
+            value={expirationDate}
+            onDateChange={(date) => {
+              setExpirationDate(date);
+              if (errors.expirationDate) {
+                setErrors({ ...errors, expirationDate: '' });
+              }
+              markManual('expirationDate', true);
+            }}
+            placeholder="Select expiration date"
+            required
+            highlighted
+            error={Boolean(errors.expirationDate)}
+            uncertain={isUncertain('expirationDate')}
+            testID="expiration-date-picker"
+          />
+          <Text style={styles.expiryHelper}>We'll remind you 1 day before.</Text>
+          {renderSourceTag('expirationDate')}
+          {errors.expirationDate && (
+            <Text style={styles.errorText}>{errors.expirationDate}</Text>
+          )}
+        </View>
 
         {/* Purchase Date */}
         <DatePickerField
@@ -501,7 +602,12 @@ export default function AddProductScreen() {
         />
 
         {/* Price */}
-        <View style={styles.fieldContainer}>
+        <View
+          style={styles.fieldContainer}
+          onLayout={(e) => {
+            priceFieldY.current = e.nativeEvent.layout.y;
+          }}
+        >
           <Text style={styles.label}>Price (optional)</Text>
           <TextInput
             style={[styles.input, errors.price && styles.inputError]}
@@ -557,7 +663,7 @@ export default function AddProductScreen() {
             value={notes}
             onChangeText={(text) => {
               setNotes(text);
-              setFieldSources((prev) => ({ ...prev, notes: { source: 'Manual', confidence: null } }));
+              markManual('notes', Boolean(text));
             }}
             placeholder="Add any additional notes..."
             placeholderTextColor="#9ca3af"
@@ -577,9 +683,13 @@ export default function AddProductScreen() {
           disabled={saving}
           activeOpacity={0.8}
           testID="save-button"
+          accessibilityState={{ busy: saving, disabled: saving }}
         >
           {saving ? (
-            <ActivityIndicator size="small" color="#ffffff" />
+            <View style={styles.savingRow}>
+              <ActivityIndicator size="small" color="#ffffff" />
+              <Text style={styles.saveButtonText}>Saving…</Text>
+            </View>
           ) : (
             <>
               <Ionicons name="checkmark-circle" size={20} color="#ffffff" />
@@ -658,6 +768,43 @@ const styles = StyleSheet.create({
   scanNotFoundDismiss: {
     padding: 4,
   },
+  reviewSummary: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    marginBottom: 16,
+    borderWidth: 1,
+  },
+  reviewSummaryCaution: {
+    backgroundColor: '#fffbeb',
+    borderColor: '#f59e0b',
+  },
+  reviewSummaryCalm: {
+    backgroundColor: '#ecfdf5',
+    borderColor: '#6ee7b7',
+  },
+  reviewSummaryCopy: {
+    flex: 1,
+    gap: 4,
+  },
+  reviewSummaryHeadline: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1f2937',
+  },
+  reviewSummaryDetail: {
+    fontSize: 13,
+    color: '#4b5563',
+    lineHeight: 18,
+  },
+  reviewSummaryMeta: {
+    fontSize: 12,
+    color: '#6b7280',
+    marginTop: 2,
+  },
   expiryHelper: {
     fontSize: 13,
     color: '#6b7280',
@@ -700,6 +847,11 @@ const styles = StyleSheet.create({
   },
   inputError: {
     borderColor: '#ef4444',
+    backgroundColor: '#fef2f2',
+  },
+  inputUncertain: {
+    borderColor: '#d97706',
+    backgroundColor: '#fffbeb',
   },
   readOnly: {
     backgroundColor: '#f9fafb',
@@ -771,6 +923,11 @@ const styles = StyleSheet.create({
   saveButtonDisabled: {
     opacity: 0.6,
   },
+  savingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
   saveButtonText: {
     fontSize: 18,
     fontWeight: '600',
@@ -818,6 +975,7 @@ const styles = StyleSheet.create({
     color: '#2563eb',
   },
   sourceTagLow: {
-    color: '#b91c1c',
+    color: '#b45309',
+    fontWeight: '600',
   },
 });

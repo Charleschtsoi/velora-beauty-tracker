@@ -2,6 +2,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { supabase } from './supabase';
 import { isSupabaseConfigured } from '../config/supabaseConfig';
 import type { DemoProductInput } from '../config/demoProducts';
+import { toUserFacingAiError } from '../utils/userFacingErrors';
 
 export type AIFieldKey =
   | 'name'
@@ -63,26 +64,10 @@ export async function analyzeProductImage(
     });
 
     if (error) {
-      const status = (error as any)?.status;
-      const responseText = (error as any)?.context?.response;
-      let formattedResp: string | null = null;
-      if (responseText && typeof responseText === 'string') {
-        try {
-          formattedResp = JSON.stringify(JSON.parse(responseText), null, 2);
-        } catch {
-          formattedResp = responseText;
-        }
-      }
-      const messageParts = [
-        status ? `status ${status}` : null,
-        error.message || 'Edge Function error',
-        formattedResp ? `response: ${formattedResp}` : null,
-      ].filter(Boolean);
-      const message = messageParts.join(' | ');
-
+      // Keep raw details in rawResponse for debugging; surface a safe message only.
       return {
         success: false,
-        error: message,
+        error: toUserFacingAiError(error),
         rawResponse: error,
       };
     }
@@ -129,8 +114,7 @@ export async function analyzeProductImage(
       rawResponse: data,
     };
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Failed to process image';
-    return { success: false, error: message };
+    return { success: false, error: toUserFacingAiError(err) };
   }
 }
 
@@ -167,18 +151,10 @@ export async function resolveDemoProductImage(
     });
 
     if (error) {
-      const status = (error as any)?.status;
-      const responseText = (error as any)?.context?.response;
-      const messageParts = [
-        status ? `status ${status}` : null,
-        error.message || 'Edge Function error',
-        responseText ?? null,
-      ].filter(Boolean);
-
       return {
         success: false,
         matched: false,
-        error: messageParts.join(' | '),
+        error: toUserFacingAiError(error),
         rawResponse: error,
       };
     }
@@ -211,8 +187,7 @@ export async function resolveDemoProductImage(
       rawResponse: data,
     };
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Failed to resolve demo product';
-    return { success: false, matched: false, error: message };
+    return { success: false, matched: false, error: toUserFacingAiError(err) };
   }
 }
 
