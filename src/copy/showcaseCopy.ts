@@ -23,7 +23,10 @@ export const showcaseCopy = {
 
   scanNotFoundBanner:
     "We couldn't find this product in our database. Please help us add it below — take or keep a product photo for your shelf record.",
-  aiPrefillBanner: 'AI-extracted data • Please review and edit as needed',
+  aiPrefillBanner:
+    'AI suggested values from the label photo. Please verify before saving — extraction can be wrong.',
+  aiAnalyzedReviewToast:
+    'Suggested fields filled from the photo. Review anything uncertain, then save.',
 } as const;
 
 export function getPresenterPickerCopy(

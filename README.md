@@ -6,9 +6,15 @@ Velora is an Expo React Native app for tracking beauty product expiration dates 
 
 - Barcode scan flow with Supabase lookup (`lookup-product` edge function)
 - AI photo flow for label extraction (`analyze-product-image`) with barcode-assisted fallback
-- One-tap camera experience in AI mode (auto-captures post-barcode label photo)
+- Add Product **review → correct → save** with confidence labels, validation, and safe error copy
 - Expiration reminders and inventory status (expired / expiring soon / safe)
-- Demo catalog mode for investor/demo walkthroughs
+- Optional demo catalog mode (`DEMO_MODE` in `src/config/demoMode.ts`) for investor walkthroughs
+
+## Workshop / portfolio
+
+- Demo steps & limitations: [`docs/WORKSHOP_DEMO.md`](docs/WORKSHOP_DEMO.md)
+- Short factual summary: [`docs/PORTFOLIO_SUMMARY.md`](docs/PORTFOLIO_SUMMARY.md)
+- Unit tests (validation / confidence / error sanitization): `npm test`
 
 ## Tech Stack
 

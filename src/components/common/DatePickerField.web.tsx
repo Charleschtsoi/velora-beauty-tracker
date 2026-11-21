@@ -8,6 +8,8 @@ interface DatePickerFieldProps {
   placeholder?: string;
   required?: boolean;
   highlighted?: boolean;
+  error?: boolean;
+  uncertain?: boolean;
   testID?: string;
   minimumDate?: Date;
   maximumDate?: Date;
@@ -20,6 +22,8 @@ export default function DatePickerField({
   placeholder = 'Select date',
   required = false,
   highlighted = false,
+  error = false,
+  uncertain = false,
   testID,
   minimumDate,
   maximumDate,
@@ -59,10 +63,24 @@ export default function DatePickerField({
         min={formatMinMax(minimumDate)}
         max={formatMinMax(maximumDate)}
         style={{
-          backgroundColor: highlighted ? '#fef3c7' : '#ffffff',
+          backgroundColor: error
+            ? '#fef2f2'
+            : uncertain
+              ? '#fffbeb'
+              : highlighted
+                ? '#fef3c7'
+                : '#ffffff',
           borderWidth: 1,
           borderStyle: 'solid',
-          borderColor: value ? '#10b981' : (highlighted ? '#fbbf24' : '#e5e7eb'),
+          borderColor: error
+            ? '#ef4444'
+            : uncertain
+              ? '#d97706'
+              : value
+                ? '#10b981'
+                : highlighted
+                  ? '#fbbf24'
+                  : '#e5e7eb',
           borderRadius: 8,
           paddingLeft: 12,
           paddingRight: 12,

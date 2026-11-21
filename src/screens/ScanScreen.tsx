@@ -47,6 +47,8 @@ import { onProductSaved } from '../services/localNotificationService';
 import { colors, spacing, radius, shadow, typography } from '../theme';
 import { scanCameraCopy, truncateBarcodeForDisplay, normalizeCaptureError } from '../copy/scanCamera';
 import { getPresenterPickerCopy, showcaseCopy } from '../copy/showcaseCopy';
+import { toUserFacingAiError } from '../utils/userFacingErrors';
+import { FIXTURE_AI_FIELDS_MIXED } from '../utils/addProductFixtures';
 import { ScanCameraHint } from '../components/scan/ScanCameraHint';
 
 const { width, height } = Dimensions.get('window');
@@ -809,7 +811,7 @@ export default function ScanScreen() {
                 knownFieldsRef.current
               );
             } else if (!backendResolution.success && backendResolution.error) {
-              showToast(backendResolution.error, 'error');
+              showToast(toUserFacingAiError(backendResolution.error), 'error');
             }
           } catch (error: unknown) {
             const message = error instanceof Error ? error.message : 'Photo match unavailable';
@@ -910,7 +912,7 @@ export default function ScanScreen() {
 
       resetAiSessionBarcode();
       setTimeout(() => {
-        showToast('Product analyzed! Filling form...', 'success');
+        showToast(showcaseCopy.aiAnalyzedReviewToast, 'info');
         openAddProduct({
           aiData: analysisResult.fields,
           aiFlatData: analysisResult.flatData,
@@ -931,7 +933,7 @@ export default function ScanScreen() {
         showToast(normalizeCaptureError(error), 'info');
         return;
       }
-      showToast(message || 'Could not read this label. Try again or add manually.', 'error');
+      showToast(toUserFacingAiError(error), 'error');
       openAddProduct({
         photoUri: photo?.uri,
         scanNotFound: true,
@@ -950,6 +952,26 @@ export default function ScanScreen() {
       </SafeAreaView>
     );
   }
+
+  const openFixtureReviewForm = () => {
+    openAddProduct({
+      aiData: FIXTURE_AI_FIELDS_MIXED,
+      scanNotFound: true,
+    });
+  };
+
+  const renderDevFixtureLink = () =>
+    __DEV__ ? (
+      <TouchableOpacity
+        style={styles.devFixtureLink}
+        onPress={openFixtureReviewForm}
+        testID="dev-fixture-review-link"
+      >
+        <Text style={styles.devFixtureLinkText}>
+          Dev: open review form with fixture AI fields (not live Gemini)
+        </Text>
+      </TouchableOpacity>
+    ) : null;
 
   // Permission denied state
   if (!permission.granted) {
@@ -975,6 +997,7 @@ export default function ScanScreen() {
           >
             <Text style={styles.manualEntryButtonText}>Use Manual Entry Instead</Text>
           </TouchableOpacity>
+          {renderDevFixtureLink()}
         </View>
       </SafeAreaView>
     );
@@ -997,6 +1020,7 @@ export default function ScanScreen() {
           >
             <Text style={styles.manualEntryButtonText}>Use Manual Entry</Text>
           </TouchableOpacity>
+          {renderDevFixtureLink()}
         </View>
       </SafeAreaView>
     );
@@ -1291,7 +1315,10 @@ export default function ScanScreen() {
               if (scanMode !== 'ai' && aiModeAvailable) {
                 toggleScanMode();
               } else if (!aiModeAvailable) {
-                showToast('AI service not configured. Please set API key.', 'error');
+                showToast(
+                  'Label photo mode needs Supabase URL and anon key configured (Edge Function holds the model key).',
+                  'error',
+                );
               }
             }}
             disabled={isAnalyzing || !aiModeAvailable || !!postBarcodeCapture}
@@ -1367,6 +1394,8 @@ export default function ScanScreen() {
             <Text style={styles.manualEntryLinkText}>{scanCameraCopy.manualEntryAction}</Text>
           </Text>
         </TouchableOpacity>
+
+        {renderDevFixtureLink()}
       </View>
     </SafeAreaView>
   );
@@ -1817,6 +1846,17 @@ const styles = StyleSheet.create({
   manualEntryLink: {
     marginTop: spacing.md,
     alignItems: 'center',
+  },
+  devFixtureLink: {
+    marginTop: spacing.sm,
+    alignItems: 'center',
+    paddingHorizontal: spacing.md,
+  },
+  devFixtureLinkText: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    textDecorationLine: 'underline',
   },
   manualEntryText: {
     ...typography.body,
