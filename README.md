@@ -1,38 +1,67 @@
-# Velora - Beauty Product Expiration Tracker
+# Velora
 
-Velora is an Expo React Native app for tracking beauty product expiration dates with barcode scanning, AI-assisted label capture, and reminder notifications.
+**Beauty shelf tracker with honest AI intake.**  
+Scan a barcode or label photo → review suggested fields (with confidence) → save → get expiry reminders.
 
-## Highlights
+Built with React Native / Expo. Suitable as a portfolio case study for AI-assisted product workflows (human review before save — not silent autopilot).
 
-- Barcode scan flow with Supabase lookup (`lookup-product` edge function)
-- AI photo flow for label extraction (`analyze-product-image`) with barcode-assisted fallback
-- Add Product **review → correct → save** with confidence labels, validation, and safe error copy
-- Expiration reminders and inventory status (expired / expiring soon / safe)
-- Optional demo catalog mode (`DEMO_MODE` in `src/config/demoMode.ts`) for investor walkthroughs
+<p align="center">
+  <img src="docs/screenshots/01-home.png" alt="Velora home — shelf care overview" width="260" />
+  &nbsp;
+  <img src="docs/screenshots/02-add-review.png" alt="Add Product — AI review with confidence labels" width="260" />
+  &nbsp;
+  <img src="docs/screenshots/03-product-detail.png" alt="Product detail — SAFE status and expiry" width="260" />
+</p>
 
-## Workshop / portfolio
+<p align="center"><sub>
+<strong>Home</strong> · shelf status at a glance &nbsp;|&nbsp;
+<strong>Review</strong> · AI suggestions with confidence &nbsp;|&nbsp;
+<strong>Detail</strong> · saved item + expiry status
+</sub></p>
 
-- Demo steps & limitations: [`docs/WORKSHOP_DEMO.md`](docs/WORKSHOP_DEMO.md)
-- Short factual summary: [`docs/PORTFOLIO_SUMMARY.md`](docs/PORTFOLIO_SUMMARY.md)
-- Unit tests (validation / confidence / error sanitization): `npm test`
+## What it is (10 seconds)
 
-## Tech Stack
+| | |
+|---|---|
+| **Problem** | Beauty products expire; people lose track of open dates and batch expiry. |
+| **Product** | Mobile inventory for skincare / makeup / fragrance with reminders. |
+| **AI role** | Optional label-photo extraction and barcode lookup that **pre-fill** a form — the user confirms uncertain fields before save. |
+| **Not** | Skin diagnosis, medical advice, or a production SaaS claim with user metrics. |
 
-- React Native + Expo SDK 54
-- TypeScript
-- React Navigation
-- Supabase (Edge Functions + Postgres)
-- NativeWind/Tailwind
+## Product screens
 
-## Requirements
+| Screen | What you see |
+|--------|----------------|
+| **Home** | Care summary, add CTA, shelf counts (use soon / past date / total). |
+| **Add Product (review)** | Prefill from scan/AI, review banner, High / Medium / Low confidence tags, amber “double-check” fields, validation before save. |
+| **Product Detail** | Saved record with SAFE / expiring / expired status and countdown. |
 
-- Node.js 20.19+ (or newer LTS)
-- npm
-- Expo Go (iOS/Android) for physical-device testing
+Screenshots above were captured from the Expo **web** target in development (camera unavailable on web; AI review shown via a marked fixture path — see [`docs/WORKSHOP_DEMO.md`](docs/WORKSHOP_DEMO.md)).
 
-## Getting Started
+## Core flow
 
-1. Clone and install:
+```text
+Barcode lookup  ─┐
+                 ├─→  Add Product (review / correct)  →  Save  →  Detail + reminders
+AI label photo  ─┘
+Manual entry    ─┘
+```
+
+- **Barcode** → Supabase Edge Function `lookup-product` (cache / Open Food Facts / demo catalog)
+- **AI photo** → Edge Function `analyze-product-image` (Gemini server-side; no model key in the client)
+- **Review** → confidence labels, missing critical fields called out, user edits before save
+- **Storage** → guest: AsyncStorage; signed-in: optional Supabase `products`
+
+## Tech stack
+
+- React Native + Expo SDK 54 · TypeScript · React Navigation
+- Supabase (Edge Functions + optional Postgres)
+- NativeWind / Tailwind
+- Local notifications for expiry reminders (native; skipped on web)
+
+## Getting started
+
+**Requirements:** Node.js 20.19+ (or newer LTS), npm. Expo Go for physical devices.
 
 ```bash
 git clone https://github.com/Charleschtsoi/velora-beauty-tracker.git
@@ -40,96 +69,51 @@ cd velora-beauty-tracker
 npm install
 ```
 
-2. Configure environment (`.env.local`):
+Configure `.env.local` (see `.env.example` / [`ENV_SETUP.md`](ENV_SETUP.md)):
 
 ```bash
 EXPO_PUBLIC_SUPABASE_URL=your_supabase_url
 EXPO_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 ```
 
-3. Start app:
+Gemini lives only as an Edge Function secret (`GEMINI_API_KEY`) — never in the client.
 
 ```bash
-npm start
+npm start          # Expo (runs a small connection diagnostic first)
+npm run web        # Browser (best for headless / cloud VMs)
+npm run ios        # iOS simulator
+npm run android    # Android emulator
+npm test           # Focused unit tests (validation, confidence, error copy)
 ```
 
-## Development Commands
+## Workshop / portfolio notes
 
-- Start (default): `npm start`
-- Start tunnel (strict helper): `npm run start:tunnel`
-- iOS simulator: `npm run ios`
-- Android emulator: `npm run android`
-- Web: `npm run web`
+- Reproducible demo + limitations: [`docs/WORKSHOP_DEMO.md`](docs/WORKSHOP_DEMO.md)
+- Short factual summary: [`docs/PORTFOLIO_SUMMARY.md`](docs/PORTFOLIO_SUMMARY.md)
+- `DEMO_MODE` in `src/config/demoMode.ts` — `false` = real review path (default); `true` = curated catalog auto-add for investor walkthroughs
 
-## Supabase Migrations
-
-Project includes Supabase migrations under `supabase/migrations` (demo catalog + updates).
-
-Apply migrations to remote:
-
-```bash
-supabase db push --include-all
-```
-
-## Scan Experience (Current)
-
-- **Barcode mode**: scans barcode and looks up metadata via Supabase edge function.
-- **AI Photo mode**: captures product photo, analyzes label, and merges barcode lookup when available.
-- If barcode is recognized during AI capture, Velora uses it to improve matching and expiry prefill.
-- Post-barcode label capture is now automatic once camera is ready (no extra tap required).
-
-## Demo Catalog Notes
-
-Demo products are configured in:
-
-- `src/config/demoProducts.ts`
-- `supabase/migrations/*demo*`
-
-Recent demo updates include Chanel, Hada Labo, and Neutrogena catalog entries (with expiry metadata aligned in Supabase).
-
-## Troubleshooting
-
-### Expo package compatibility warning
-
-If Expo suggests patch updates, run:
-
-```bash
-npx expo install expo expo-file-system expo-image-picker expo-notifications
-```
-
-Then restart Metro.
-
-### Tunnel errors (`remote gone away`)
-
-Tunnel uses ngrok and can be intermittent.
-
-- Retry `npx expo start --tunnel`
-- Check https://status.ngrok.com/
-- Try another network/hotspot
-- If phone and Mac are on same Wi-Fi, use LAN (`npm start`) instead
-
-### Camera issues
-
-- Grant camera permission in OS settings
-- Use Manual entry fallback if camera is unavailable
-
-## Project Structure
+## Project structure
 
 ```text
 src/
-  components/
-  config/
-  context/
-  navigation/
-  screens/
-  services/
-  theme/
-  types/
-  utils/
+  screens/          # Home, Scan, Add Product, Detail, Inventory, …
+  services/         # AI, barcode lookup, products, auth, notifications
+  utils/            # Confidence, validation, user-facing errors (tested)
+  config/           # demoMode, demoProducts, supabase
 supabase/
-  functions/
+  functions/        # analyze-product-image, lookup-product, …
   migrations/
+docs/
+  screenshots/      # README product screens
 ```
+
+## Troubleshooting
+
+**Expo package warnings** — run `npx expo install expo expo-file-system expo-image-picker expo-notifications`, then restart Metro.
+
+**Tunnel (`remote gone away`)** — retry `npx expo start --tunnel`, check [ngrok status](https://status.ngrok.com/), or use LAN (`npm start`) on the same Wi‑Fi.
+
+**Camera** — grant OS permission, or use Manual entry / (in `__DEV__`) the fixture review link on Scan.
 
 ## License
 
